@@ -4,7 +4,7 @@
 declare @resources xml
 --a resource will be deleted if its value is empty
 set @resources='
-<Language>
+<Language>  
   <LocaleResource Name="Admin.Configuration.Settings.GeneralCommon.EnableHtmlMinification">
     <Value>HTML minification</Value>
   </LocaleResource>
@@ -176,6 +176,39 @@ set @resources='
   <LocaleResource Name="Admin.Configuration.Settings.GeneralCommon.FaviconAndAppIcons.UploadIconsArchive.Hint">
     <Value>Upload archive with favicon and app icons for different operating systems and devices. You can see an example of the favicon and app icons archive in /icons/samples in the root of the site. Your favicon and app icons path is "/icons/icons_{0}"</Value>
   </LocaleResource>
+  <LocaleResource Name="Admin.ContentManagement.MessageTemplates.Description.Wishlist.EmailAFriend">
+    <Value><![CDATA[This message template is used when a customer wants to share some product from the wishlist with a friend by sending an email. You can set up this option by ticking the checkbox Allow customers to email their wishlists in Configuration - Settings - Shopping cart settings.]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Payment.Methods.DownloadMorePlugins">
+    <Value><![CDATA[You can download more plugins in our <a href="https://www.nopcommerce.com/extensions?category=payment-modules&utm_source=admin-panel&utm_medium=payment-plugins&utm_campaign=admin-panel" target="_blank">marketplace</a>]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Plugins.Description.DownloadMorePlugins">
+    <Value><![CDATA[You can download more nopCommerce plugins in our <a href="https://www.nopcommerce.com/marketplace?utm_source=admin-panel&utm_medium=plugins&utm_campaign=admin-panel" target="_blank">marketplace</a>]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Plugins.OfficialFeed.Instructions">
+    <Value><![CDATA[Here you can find third-party extensions and themes which are developed by our community and partners. They are also available in our <a href="https://www.nopcommerce.com/marketplace?utm_source=admin-panel&utm_medium=official-plugins&utm_campaign=admin-panel" target="_blank">marketplace</a>]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Settings.GeneralCommon.DefaultStoreTheme.GetMore">
+    <Value><![CDATA[You can get more themes in our <a href="https://www.nopcommerce.com/themes?utm_source=admin-panel&utm_medium=theme-settings&utm_campaign=admin-panel" target="_blank">marketplace</a>]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Shipping.Providers.DownloadMorePlugins">
+    <Value><![CDATA[You can download more plugins in our <a href="https://www.nopcommerce.com/extensions?category=shipping-delivery&utm_source=admin-panel&utm_medium=shipping-plugins&utm_campaign=admin-panel" target="_blank">marketplace</a>]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Tax.Providers.DownloadMorePlugins">
+    <Value><![CDATA[You can download more plugins in our <a href="https://www.nopcommerce.com/extensions?category=taxes&utm_source=admin-panel&utm_medium=tax-plugins&utm_campaign=admin-panel" target="_blank">marketplace</a>]]></Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Settings.GeneralCommon.Microdata">
+    <Value>Microdata tags</Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Configuration.Settings.GeneralCommon.Microdata.Hint">
+    <Value>Check to generate Microdata tags on the product details page.</Value>
+  </LocaleResource>
+   <LocaleResource Name="Admin.Promotions.Discounts.Fields.AdminComment">
+    <Value>Admin comment</Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.Promotions.Discounts.Fields.AdminComment.Hint">
+    <Value>This comment is for internal use only, not visible for customers.</Value>
+  </LocaleResource>
 </Language>
 '
 
@@ -275,17 +308,120 @@ END
 GO
 
 --new column
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=object_id('[StorePickupPoint]') and NAME='Latitude')
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[StorePickupPoint]') and OBJECTPROPERTY(object_id, N'IsUserTable') = 1)
+and NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = object_id('[StorePickupPoint]') AND NAME = 'Latitude')
 BEGIN
-	ALTER TABLE [StorePickupPoint] ADD
-	Latitude decimal(18, 8) NULL
+	ALTER TABLE [StorePickupPoint]
+	ADD Latitude decimal(18, 8) NULL
 END
 GO
 
 --new column
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=object_id('[StorePickupPoint]') and NAME='Longitude')
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[StorePickupPoint]') and OBJECTPROPERTY(object_id, N'IsUserTable') = 1)
+and NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = object_id('[StorePickupPoint]') AND NAME = 'Longitude')
 BEGIN
-	ALTER TABLE [StorePickupPoint] ADD
-	Longitude decimal(18, 8) NULL
+	ALTER TABLE [StorePickupPoint]
+	ADD Longitude decimal(18, 8) NULL
 END
 GO
+
+-- update the "DeleteGuests" stored procedure
+ALTER PROCEDURE [dbo].[DeleteGuests]
+(
+	@OnlyWithoutShoppingCart bit = 1,
+	@CreatedFromUtc datetime,
+	@CreatedToUtc datetime,
+	@TotalRecordsDeleted int = null OUTPUT
+)
+AS
+BEGIN
+	CREATE TABLE #tmp_guests (CustomerId int)
+		
+	INSERT #tmp_guests (CustomerId)
+	SELECT c.[Id] 
+	FROM [Customer] c with (NOLOCK)
+		LEFT JOIN [ShoppingCartItem] sci with (NOLOCK) ON sci.[CustomerId] = c.[Id]
+		INNER JOIN (
+			--guests only
+			SELECT ccrm.[Customer_Id] 
+			FROM [Customer_CustomerRole_Mapping] ccrm with (NOLOCK)
+				INNER JOIN [CustomerRole] cr with (NOLOCK) ON cr.[Id] = ccrm.[CustomerRole_Id]
+			WHERE cr.[SystemName] = N'Guests'
+		) g ON g.[Customer_Id] = c.[Id]
+		LEFT JOIN [Order] o with (NOLOCK) ON o.[CustomerId] = c.[Id]
+		LEFT JOIN [BlogComment] bc with (NOLOCK) ON bc.[CustomerId] = c.[Id]
+		LEFT JOIN [NewsComment] nc with (NOLOCK) ON nc.[CustomerId] = c.[Id]
+		LEFT JOIN [ProductReview] pr with (NOLOCK) ON pr.[CustomerId] = c.[Id]
+		LEFT JOIN [ProductReviewHelpfulness] prh with (NOLOCK) ON prh.[CustomerId] = c.[Id]
+		LEFT JOIN [PollVotingRecord] pvr with (NOLOCK) ON pvr.[CustomerId] = c.[Id]
+		LEFT JOIN [Forums_Topic] ft with (NOLOCK) ON ft.[CustomerId] = c.[Id]
+		LEFT JOIN [Forums_Post] fp with (NOLOCK) ON fp.[CustomerId] = c.[Id]
+	WHERE 1 = 1
+		--no orders
+		AND (o.Id is null)
+		--no blog comments
+		AND (bc.Id is null)
+		--no news comments
+		AND (nc.Id is null)
+		--no product reviews
+		AND (pr.Id is null)
+		--no product reviews helpfulness
+		AND (prh.Id is null)
+		--no poll voting
+		AND (pvr.Id is null)
+		--no forum topics
+		AND (ft.Id is null)
+		--no forum topics
+		AND (fp.Id is null)
+		--no system accounts
+		AND (c.IsSystemAccount = 0)
+		--created from
+		AND ((@CreatedFromUtc is null) OR (c.[CreatedOnUtc] > @CreatedFromUtc))
+		--created to
+		AND ((@CreatedToUtc is null) OR (c.[CreatedOnUtc] < @CreatedToUtc))
+		--shopping cart items
+		AND ((@OnlyWithoutShoppingCart = 0) OR (sci.Id is null))
+	
+	--delete guests
+	DELETE [Customer]
+	WHERE [Id] IN (SELECT [CustomerId] FROM #tmp_guests)
+	
+	--delete attributes
+	DELETE [GenericAttribute]
+	WHERE ([EntityId] IN (SELECT [CustomerId] FROM #tmp_guests))
+	AND
+	([KeyGroup] = N'Customer')
+	
+	--total records
+	SELECT @TotalRecordsDeleted = COUNT(1) FROM #tmp_guests
+	
+	DROP TABLE #tmp_guests
+END
+GO
+
+--new setting
+IF NOT EXISTS (SELECT 1 FROM [Setting] WHERE [Name] = N'captchasettings.recaptchaapiurl')
+BEGIN
+    INSERT [Setting] ([Name], [Value], [StoreId])
+    VALUES (N'captchasettings.recaptchaapiurl', N'https://www.google.com/recaptcha/', 0)
+END
+GO
+GO
+
+--new setting
+IF NOT EXISTS (SELECT 1 FROM [Setting] WHERE [Name] = N'seosettings.microdataenabled')
+BEGIN
+    INSERT [Setting] ([Name], [Value], [StoreId])
+    VALUES (N'seosettings.microdataenabled', 'true', 0)
+END
+GO
+
+--new column
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=object_id('[Discount]') and NAME='AdminComment')
+BEGIN
+	ALTER TABLE [Discount] ADD
+	AdminComment nvarchar(max) NULL
+END
+GO
+
+ 
