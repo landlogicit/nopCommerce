@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Nop.Services.Plugins
 {
@@ -11,13 +12,18 @@ namespace Nop.Services.Plugins
         /// <summary>
         /// Save plugins info to the file
         /// </summary>
+        Task SaveAsync();
+
+        /// <summary>
+        /// Save plugins info to the file
+        /// </summary>
         void Save();
 
         /// <summary>
         /// Get plugins info
         /// </summary>
         /// <returns>True if data are loaded, otherwise False</returns>
-        bool LoadPluginInfo();
+        Task<bool> LoadPluginInfoAsync();
 
         /// <summary>
         /// Create copy from another instance of IPluginsInfo interface
@@ -26,9 +32,9 @@ namespace Nop.Services.Plugins
         void CopyFrom(IPluginsInfo pluginsInfo);
         
         /// <summary>
-        /// Gets or sets the list of all installed plugin names
+        /// Gets or sets the list of all installed plugin
         /// </summary>
-        IList<string> InstalledPluginNames { get; set; }
+        IList<PluginDescriptorBaseInfo> InstalledPlugins { get; set; }
 
         /// <summary>
         /// Gets or sets the list of plugin names which will be uninstalled
@@ -53,7 +59,7 @@ namespace Nop.Services.Plugins
         /// <summary>
         /// Gets or sets a collection of plugin descriptors of all deployed plugins
         /// </summary>
-        IEnumerable<PluginDescriptor> PluginDescriptors { get; set; }
+        IList<PluginDescriptor> PluginDescriptors { get; set; }
 
         /// <summary>
         /// Gets or sets the list of plugin names which are not compatible with the current version

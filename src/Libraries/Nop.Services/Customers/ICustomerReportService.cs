@@ -1,9 +1,11 @@
-using System;
+﻿using System;
+using System.Threading.Tasks;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Domain.Shipping;
+using Nop.Services.Orders;
 
 namespace Nop.Services.Customers
 {
@@ -24,15 +26,15 @@ namespace Nop.Services.Customers
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Report</returns>
-        IPagedList<BestCustomerReportLine> GetBestCustomersReport(DateTime? createdFromUtc,
-            DateTime? createdToUtc, OrderStatus? os, PaymentStatus? ps, ShippingStatus? ss, int orderBy,
+        Task<IPagedList<BestCustomerReportLine>> GetBestCustomersReportAsync(DateTime? createdFromUtc,
+            DateTime? createdToUtc, OrderStatus? os, PaymentStatus? ps, ShippingStatus? ss, OrderByEnum orderBy,
             int pageIndex = 0, int pageSize = 214748364);
-        
+
         /// <summary>
         /// Gets a report of customers registered in the last days
         /// </summary>
         /// <param name="days">Customers registered in the last days</param>
         /// <returns>Number of registered customers</returns>
-        int GetRegisteredCustomersReport(int days);
+        Task<int> GetRegisteredCustomersReportAsync(int days);
     }
 }

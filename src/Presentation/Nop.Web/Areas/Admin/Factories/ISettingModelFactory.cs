@@ -1,4 +1,5 @@
-﻿using Nop.Core.Domain.Gdpr;
+﻿using System.Threading.Tasks;
+using Nop.Core.Domain.Gdpr;
 using Nop.Web.Areas.Admin.Models.Settings;
 
 namespace Nop.Web.Areas.Admin.Factories
@@ -9,96 +10,116 @@ namespace Nop.Web.Areas.Admin.Factories
     public partial interface ISettingModelFactory
     {
         /// <summary>
+        /// Prepare app settings model
+        /// </summary>
+        /// <param name="model">AppSettings model</param>
+        /// <returns>App settings model</returns>
+        Task<AppSettingsModel> PrepareAppSettingsModel(AppSettingsModel model = null);
+
+        /// <summary>
         /// Prepare blog settings model
         /// </summary>
+        /// <param name="model">Blog settings model</param>
         /// <returns>Blog settings model</returns>
-        BlogSettingsModel PrepareBlogSettingsModel();
+        Task<BlogSettingsModel> PrepareBlogSettingsModelAsync(BlogSettingsModel model = null);
 
         /// <summary>
         /// Prepare vendor settings model
         /// </summary>
+        /// <param name="model">Vendor settings model</param>
         /// <returns>Vendor settings model</returns>
-        VendorSettingsModel PrepareVendorSettingsModel();
+        Task<VendorSettingsModel> PrepareVendorSettingsModelAsync(VendorSettingsModel model = null);
 
         /// <summary>
         /// Prepare forum settings model
         /// </summary>
+        /// <param name="model">Forum settings model</param>
         /// <returns>Forum settings model</returns>
-        ForumSettingsModel PrepareForumSettingsModel();
+        Task<ForumSettingsModel> PrepareForumSettingsModelAsync(ForumSettingsModel model = null);
 
         /// <summary>
         /// Prepare news settings model
         /// </summary>
+        /// <param name="model">News settings model</param>
         /// <returns>News settings model</returns>
-        NewsSettingsModel PrepareNewsSettingsModel();
+        Task<NewsSettingsModel> PrepareNewsSettingsModelAsync(NewsSettingsModel model = null);
 
         /// <summary>
         /// Prepare shipping settings model
         /// </summary>
+        /// <param name="model">Shipping settings model</param>
         /// <returns>Shipping settings model</returns>
-        ShippingSettingsModel PrepareShippingSettingsModel();
+        Task<ShippingSettingsModel> PrepareShippingSettingsModelAsync(ShippingSettingsModel model = null);
 
         /// <summary>
         /// Prepare tax settings model
         /// </summary>
+        /// <param name="model">Tax settings model</param>
         /// <returns>Tax settings model</returns>
-        TaxSettingsModel PrepareTaxSettingsModel();
+        Task<TaxSettingsModel> PrepareTaxSettingsModelAsync(TaxSettingsModel model = null);
 
         /// <summary>
         /// Prepare catalog settings model
         /// </summary>
+        /// <param name="model">Catalog settings model</param>
         /// <returns>Catalog settings model</returns>
-        CatalogSettingsModel PrepareCatalogSettingsModel();
-        
+        Task<CatalogSettingsModel> PrepareCatalogSettingsModelAsync(CatalogSettingsModel model = null);
+
         /// <summary>
         /// Prepare paged sort option list model
         /// </summary>
         /// <param name="searchModel">Sort option search model</param>
         /// <returns>Sort option list model</returns>
-        SortOptionListModel PrepareSortOptionListModel(SortOptionSearchModel searchModel);
+        Task<SortOptionListModel> PrepareSortOptionListModelAsync(SortOptionSearchModel searchModel);
 
         /// <summary>
         /// Prepare reward points settings model
         /// </summary>
+        ///<param name="model">Reward points settings model</param>
         /// <returns>Reward points settings model</returns>
-        RewardPointsSettingsModel PrepareRewardPointsSettingsModel();
+        Task<RewardPointsSettingsModel> PrepareRewardPointsSettingsModelAsync(RewardPointsSettingsModel model = null);
 
         /// <summary>
         /// Prepare order settings model
         /// </summary>
+        /// <param name="model">Order settings model</param>
         /// <returns>Order settings model</returns>
-        OrderSettingsModel PrepareOrderSettingsModel();
+        Task<OrderSettingsModel> PrepareOrderSettingsModelAsync(OrderSettingsModel model = null);
 
         /// <summary>
         /// Prepare shopping cart settings model
         /// </summary>
+        /// <param name="model">Shopping cart settings model</param>
         /// <returns>Shopping cart settings model</returns>
-        ShoppingCartSettingsModel PrepareShoppingCartSettingsModel();
+        Task<ShoppingCartSettingsModel> PrepareShoppingCartSettingsModelAsync(ShoppingCartSettingsModel model = null);
 
         /// <summary>
         /// Prepare media settings model
         /// </summary>
+        /// <param name="model">Media settings model</param>
         /// <returns>Media settings model</returns>
-        MediaSettingsModel PrepareMediaSettingsModel();
+        Task<MediaSettingsModel> PrepareMediaSettingsModelAsync(MediaSettingsModel model = null);
 
         /// <summary>
         /// Prepare customer user settings model
         /// </summary>
+        /// <param name="model">Customer user settings model</param>
         /// <returns>Customer user settings model</returns>
-        CustomerUserSettingsModel PrepareCustomerUserSettingsModel();
+        Task<CustomerUserSettingsModel> PrepareCustomerUserSettingsModelAsync(CustomerUserSettingsModel model = null);
 
         /// <summary>
         /// Prepare GDPR settings model
         /// </summary>
+        /// <param name="model">Gdpr settings model</param>
         /// <returns>GDPR settings model</returns>
-        GdprSettingsModel PrepareGdprSettingsModel();
+        Task<GdprSettingsModel> PrepareGdprSettingsModelAsync(GdprSettingsModel model = null);
 
         /// <summary>
         /// Prepare paged GDPR consent list model
         /// </summary>
         /// <param name="searchModel">GDPR search model</param>
         /// <returns>GDPR consent list model</returns>
-       GdprConsentListModel PrepareGdprConsentListModel(GdprConsentSearchModel searchModel);
+        Task<GdprConsentListModel> PrepareGdprConsentListModelAsync(GdprConsentSearchModel searchModel);
 
         /// <summary>
         /// Prepare GDPR consent model
@@ -107,45 +128,46 @@ namespace Nop.Web.Areas.Admin.Factories
         /// <param name="gdprConsent">GDPR consent</param>
         /// <param name="excludeProperties">Whether to exclude populating of some properties of model</param>
         /// <returns>GDPR consent model</returns>
-        GdprConsentModel PrepareGdprConsentModel(GdprConsentModel model, GdprConsent gdprConsent, bool excludeProperties = false);
+        Task<GdprConsentModel> PrepareGdprConsentModelAsync(GdprConsentModel model, GdprConsent gdprConsent, bool excludeProperties = false);
 
         /// <summary>
         /// Prepare general and common settings model
         /// </summary>
+        /// <param name="model">General common settings model</param>
         /// <returns>General and common settings model</returns>
-        GeneralCommonSettingsModel PrepareGeneralCommonSettingsModel();
-        
+        Task<GeneralCommonSettingsModel> PrepareGeneralCommonSettingsModelAsync(GeneralCommonSettingsModel model = null);
+
         /// <summary>
         /// Prepare product editor settings model
         /// </summary>
         /// <returns>Product editor settings model</returns>
-        ProductEditorSettingsModel PrepareProductEditorSettingsModel();
+        Task<ProductEditorSettingsModel> PrepareProductEditorSettingsModelAsync();
 
         /// <summary>
         /// Prepare setting search model
         /// </summary>
         /// <param name="searchModel">Setting search model</param>
         /// <returns>Setting search model</returns>
-        SettingSearchModel PrepareSettingSearchModel(SettingSearchModel searchModel);
+        Task<SettingSearchModel> PrepareSettingSearchModelAsync(SettingSearchModel searchModel);
 
         /// <summary>
         /// Prepare paged setting list model
         /// </summary>
         /// <param name="searchModel">Setting search model</param>
         /// <returns>Setting list model</returns>
-        SettingListModel PrepareSettingListModel(SettingSearchModel searchModel);
+        Task<SettingListModel> PrepareSettingListModelAsync(SettingSearchModel searchModel);
 
         /// <summary>
         /// Prepare setting mode model
         /// </summary>
         /// <param name="modeName">Mode name</param>
         /// <returns>Setting mode model</returns>
-        SettingModeModel PrepareSettingModeModel(string modeName);
+        Task<SettingModeModel> PrepareSettingModeModelAsync(string modeName);
 
         /// <summary>
         /// Prepare store scope configuration model
         /// </summary>
         /// <returns>Store scope configuration model</returns>
-        StoreScopeConfigurationModel PrepareStoreScopeConfigurationModel();
+        Task<StoreScopeConfigurationModel> PrepareStoreScopeConfigurationModelAsync();
     }
 }

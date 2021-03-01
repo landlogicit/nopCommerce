@@ -1,9 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Nop.Core;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Http;
+using Nop.Core.Security;
 
 namespace Nop.Services.Catalog
 {
@@ -15,20 +18,26 @@ namespace Nop.Services.Catalog
         #region Fields
 
         private readonly CatalogSettings _catalogSettings;
+        private readonly CookieSettings _cookieSettings;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IProductService _productService;
+        private readonly IWebHelper _webHelper;
 
         #endregion
 
         #region Ctor
 
         public RecentlyViewedProductsService(CatalogSettings catalogSettings,
+            CookieSettings cookieSettings,
             IHttpContextAccessor httpContextAccessor,
-            IProductService productService)
+            IProductService productService,
+            IWebHelper webHelper)
         {
             _catalogSettings = catalogSettings;
+            _cookieSettings = cookieSettings;
             _httpContextAccessor = httpContextAccessor;
             _productService = productService;
+            _webHelper = webHelper;
         }
 
         #endregion
@@ -71,7 +80,7 @@ namespace Nop.Services.Catalog
         /// Add cookie value for the recently viewed products
         /// </summary>
         /// <param name="recentlyViewedProductIds">Collection of the recently viewed products identifiers</param>
-        protected virtual void AddRecentlyViewedProductsCookie(IEnumerable<int> recentlyViewedProductIds)
+        protected virtual Task AddRecentlyViewedProductsCookieAsync(IEnumerable<int> recentlyViewedProductIds)
         {
             //delete current cookie if exists
             var cookieName = $"{NopCookieDefaults.Prefix}{NopCookieDefaults.RecentlyViewedProductsCookie}";
@@ -81,15 +90,18 @@ namespace Nop.Services.Catalog
             var productIdsCookie = string.Join(",", recentlyViewedProductIds);
 
             //create cookie options 
-            var cookieExpires = 24 * 10; //TODO make configurable
+            var cookieExpires = _cookieSettings.RecentlyViewedProductsCookieExpires;
             var cookieOptions = new CookieOptions
             {
                 Expires = DateTime.Now.AddHours(cookieExpires),
-                HttpOnly = true
+                HttpOnly = true,
+                Secure = _webHelper.IsCurrentConnectionSecured()
             };
 
             //add cookie
             _httpContextAccessor.HttpContext.Response.Cookies.Append(cookieName, productIdsCookie, cookieOptions);
+
+            return Task.CompletedTask;
         }
 
         #endregion
@@ -101,13 +113,13 @@ namespace Nop.Services.Catalog
         /// </summary>
         /// <param name="number">Number of products to load</param>
         /// <returns>"recently viewed products" list</returns>
-        public virtual IList<Product> GetRecentlyViewedProducts(int number)
+        public virtual async Task<IList<Product>> GetRecentlyViewedProductsAsync(int number)
         {
             //get list of recently viewed product identifiers
             var productIds = GetRecentlyViewedProductsIds(number);
 
             //return list of product
-            return _productService.GetProductsByIds(productIds.ToArray())
+            return (await _productService.GetProductsByIdsAsync(productIds.ToArray()))
                 .Where(product => product.Published && !product.Deleted).ToList();
         }
 
@@ -115,7 +127,7 @@ namespace Nop.Services.Catalog
         /// Adds a product to a recently viewed products list
         /// </summary>
         /// <param name="productId">Product identifier</param>
-        public virtual void AddProductToRecentlyViewedList(int productId)
+        public virtual async Task AddProductToRecentlyViewedListAsync(int productId)
         {
             if (_httpContextAccessor.HttpContext?.Response == null)
                 return;
@@ -135,7 +147,7 @@ namespace Nop.Services.Catalog
             productIds = productIds.Take(_catalogSettings.RecentlyViewedProductsNumber).ToList();
 
             //set cookie
-            AddRecentlyViewedProductsCookie(productIds);
+            await AddRecentlyViewedProductsCookieAsync(productIds);
         }
 
         #endregion
