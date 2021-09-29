@@ -2,17 +2,16 @@
 using System.Threading.Tasks;
 using Nop.Core;
 using Nop.Core.Domain.Cms;
-using Nop.Core.Domain.Tasks;
+using Nop.Core.Domain.ScheduleTasks;
 using Nop.Services.Cms;
 using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Messages;
 using Nop.Services.Plugins;
+using Nop.Services.ScheduleTasks;
 using Nop.Services.Stores;
-using Nop.Services.Tasks;
 using Nop.Web.Framework.Infrastructure;
-using Task = System.Threading.Tasks.Task;
 
 namespace Nop.Plugin.Misc.Sendinblue
 {
@@ -65,7 +64,10 @@ namespace Nop.Plugin.Misc.Sendinblue
         /// <summary>
         /// Gets widget zones where this widget should be rendered
         /// </summary>
-        /// <returns>Widget zones</returns>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the widget zones
+        /// </returns>
         public Task<IList<string>> GetWidgetZonesAsync()
         {
             return Task.FromResult<IList<string>>(new List<string> { PublicWidgetZones.HeadHtmlTag });
@@ -92,6 +94,7 @@ namespace Nop.Plugin.Misc.Sendinblue
         /// <summary>
         /// Install the plugin
         /// </summary>
+        /// <returns>A task that represents the asynchronous operation</returns>
         public override async Task InstallAsync()
         {
             //settings
@@ -127,7 +130,7 @@ namespace Nop.Plugin.Misc.Sendinblue
             }
 
             //locales
-            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
+            await _localizationService.AddOrUpdateLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Plugins.Misc.Sendinblue.AccountInfo"] = "Account info",
                 ["Plugins.Misc.Sendinblue.AccountInfo.Hint"] = "Display account information.",
@@ -191,6 +194,7 @@ namespace Nop.Plugin.Misc.Sendinblue
         /// <summary>
         /// Uninstall the plugin
         /// </summary>
+        /// <returns>A task that represents the asynchronous operation</returns>
         public override async Task UninstallAsync()
         {
             //smtp accounts
