@@ -6,7 +6,7 @@
     //page title
     ViewBag.PageTitle = T("Admin.ContentManagement.News.Comments").Text;
     //active menu item (system name)
-    Html.SetActiveMenuItemSystemName("News comments");
+    NopHtml.SetActiveMenuItemSystemName("News comments");
 }
 
 @{
@@ -32,7 +32,7 @@
             @T("Admin.ContentManagement.News.Comments.DeleteSelected")
         </button>
         <nop-action-confirmation asp-button-id="delete-selected" />
-        @await Component.InvokeAsync("AdminWidget", new { widgetZone = AdminWidgetZones.NewsCommentListButtons, additionalData = Model })
+        @await Component.InvokeAsync(typeof(AdminWidgetViewComponent), new { widgetZone = AdminWidgetZones.NewsCommentListButtons, additionalData = Model })
     </div>
 </div>
 

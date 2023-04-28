@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Nop.Core;
+﻿using Nop.Core;
 using Nop.Core.Domain.Cms;
 using Nop.Core.Domain.ScheduleTasks;
+using Nop.Plugin.Misc.Sendinblue.Components;
 using Nop.Services.Cms;
 using Nop.Services.Common;
 using Nop.Services.Configuration;
@@ -22,15 +21,15 @@ namespace Nop.Plugin.Misc.Sendinblue
     {
         #region Fields
 
-        private readonly IEmailAccountService _emailAccountService;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly ILocalizationService _localizationService;
-        private readonly IMessageTemplateService _messageTemplateService;
-        private readonly IScheduleTaskService _scheduleTaskService;
-        private readonly ISettingService _settingService;
-        private readonly IStoreService _storeService;
-        private readonly IWebHelper _webHelper;
-        private readonly WidgetSettings _widgetSettings;
+        protected readonly IEmailAccountService _emailAccountService;
+        protected readonly IGenericAttributeService _genericAttributeService;
+        protected readonly ILocalizationService _localizationService;
+        protected readonly IMessageTemplateService _messageTemplateService;
+        protected readonly IScheduleTaskService _scheduleTaskService;
+        protected readonly ISettingService _settingService;
+        protected readonly IStoreService _storeService;
+        protected readonly IWebHelper _webHelper;
+        protected readonly WidgetSettings _widgetSettings;
 
         #endregion
 
@@ -74,13 +73,13 @@ namespace Nop.Plugin.Misc.Sendinblue
         }
 
         /// <summary>
-        /// Gets a name of a view component for displaying widget
+        /// Gets a type of a view component for displaying widget
         /// </summary>
         /// <param name="widgetZone">Name of the widget zone</param>
-        /// <returns>View component name</returns>
-        public string GetWidgetViewComponentName(string widgetZone)
+        /// <returns>View component type</returns>
+        public Type GetWidgetViewComponent(string widgetZone)
         {
-            return SendinblueDefaults.TRACKING_VIEW_COMPONENT_NAME;
+            return typeof(WidgetsSendinblueViewComponent);
         }
 
         /// <summary>
@@ -123,6 +122,7 @@ namespace Nop.Plugin.Misc.Sendinblue
                 await _scheduleTaskService.InsertTaskAsync(new ScheduleTask
                 {
                     Enabled = true,
+                    LastEnabledUtc = DateTime.UtcNow,
                     Seconds = SendinblueDefaults.DefaultSynchronizationPeriod * 60 * 60,
                     Name = SendinblueDefaults.SynchronizationTaskName,
                     Type = SendinblueDefaults.SynchronizationTask,

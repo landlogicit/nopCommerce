@@ -5,7 +5,7 @@
     //page title
     ViewBag.PageTitle = T("Admin.Catalog.ProductReviews").Text;
     //active menu item (system name)
-    Html.SetActiveMenuItemSystemName("Product reviews");
+    NopHtml.SetActiveMenuItemSystemName("Product reviews");
 }
 
 @{
@@ -36,7 +36,7 @@
             </button>
             <nop-action-confirmation asp-button-id="delete-selected" />
         }
-        @await Component.InvokeAsync("AdminWidget", new { widgetZone = AdminWidgetZones.ProductReviewListButtons, additionalData = Model })
+        @await Component.InvokeAsync(typeof(AdminWidgetViewComponent), new { widgetZone = AdminWidgetZones.ProductReviewListButtons, additionalData = Model })
     </div>
 </div>
 

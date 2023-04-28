@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Nop.Core;
+﻿using Nop.Core;
 using Nop.Core.Domain.Messages;
 using Nop.Core.Infrastructure;
 using Nop.Services.Media;
@@ -15,8 +13,8 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
     {
         #region Fields
 
-        private readonly IStoreContext _storeContext;
-        private readonly SendinblueSettings _sendinblueSettings;
+        protected readonly IStoreContext _storeContext;
+        protected readonly SendinblueSettings _sendinblueSettings;
 
         #endregion
 
@@ -65,8 +63,9 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
             //add store identifier in email headers
             if (emailAccount.Id == _sendinblueSettings.EmailAccountId)
             {
+                var store = await _storeContext.GetCurrentStoreAsync();
                 headers ??= new Dictionary<string, string>();
-                headers.Add(SendinblueDefaults.EmailCustomHeader, (await _storeContext.GetCurrentStoreAsync()).Id.ToString());
+                headers.Add(SendinblueDefaults.EmailCustomHeader, store.Id.ToString());
             }
 
             await base.SendEmailAsync(emailAccount, subject, body, fromAddress, fromName, toAddress, toName, replyTo, replyToName, bcc, cc, attachmentFilePath, attachmentFileName, attachedDownloadId, headers);

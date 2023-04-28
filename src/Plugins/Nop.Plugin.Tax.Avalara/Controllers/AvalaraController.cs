@@ -1,7 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Core;
 using Nop.Core.Domain.Common;
@@ -31,18 +28,18 @@ namespace Nop.Plugin.Tax.Avalara.Controllers
     {
         #region Fields
 
-        private readonly IAclSupportedModelFactory _aclSupportedModelFactory;
-        private readonly AvalaraTaxManager _avalaraTaxManager;
-        private readonly AvalaraTaxSettings _avalaraTaxSettings;
-        private readonly CurrencySettings _currencySettings;
-        private readonly IBaseAdminModelFactory _baseAdminModelFactory;
-        private readonly ICurrencyService _currencyService;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly ILocalizationService _localizationService;
-        private readonly INotificationService _notificationService;
-        private readonly IPermissionService _permissionService;
-        private readonly ISettingService _settingService;
-        private readonly IWorkContext _workContext;
+        protected readonly IAclSupportedModelFactory _aclSupportedModelFactory;
+        protected readonly AvalaraTaxManager _avalaraTaxManager;
+        protected readonly AvalaraTaxSettings _avalaraTaxSettings;
+        protected readonly CurrencySettings _currencySettings;
+        protected readonly IBaseAdminModelFactory _baseAdminModelFactory;
+        protected readonly ICurrencyService _currencyService;
+        protected readonly IGenericAttributeService _genericAttributeService;
+        protected readonly ILocalizationService _localizationService;
+        protected readonly INotificationService _notificationService;
+        protected readonly IPermissionService _permissionService;
+        protected readonly ISettingService _settingService;
+        protected readonly IWorkContext _workContext;
 
         #endregion
 
@@ -96,6 +93,7 @@ namespace Nop.Plugin.Tax.Avalara.Controllers
                 ValidateAddress = _avalaraTaxSettings.ValidateAddress,
                 TaxOriginAddressTypeId = (int)_avalaraTaxSettings.TaxOriginAddressType,
                 EnableLogging = _avalaraTaxSettings.EnableLogging,
+                UseTaxRateTables = _avalaraTaxSettings.UseTaxRateTables,
                 GetTaxRateByAddressOnly = _avalaraTaxSettings.GetTaxRateByAddressOnly,
                 EnableCertificates = _avalaraTaxSettings.EnableCertificates,
                 AutoValidateCertificate = _avalaraTaxSettings.AutoValidateCertificate,
@@ -179,6 +177,7 @@ namespace Nop.Plugin.Tax.Avalara.Controllers
             _avalaraTaxSettings.ValidateAddress = model.ValidateAddress;
             _avalaraTaxSettings.TaxOriginAddressType = (TaxOriginAddressType)model.TaxOriginAddressTypeId;
             _avalaraTaxSettings.EnableLogging = model.EnableLogging;
+            _avalaraTaxSettings.UseTaxRateTables = model.UseTaxRateTables;
             _avalaraTaxSettings.GetTaxRateByAddressOnly = model.GetTaxRateByAddressOnly;
             _avalaraTaxSettings.EnableCertificates = model.EnableCertificates;
             _avalaraTaxSettings.AutoValidateCertificate = model.AutoValidateCertificate;
@@ -285,11 +284,11 @@ namespace Nop.Plugin.Tax.Avalara.Controllers
             if (transaction?.totalTax != null)
             {
                 //display tax rates by jurisdictions
-                testTaxResult = $"Total tax rate: {transaction.totalTax:0.00}% {Environment.NewLine}";
+                testTaxResult = $"Total tax rate: {transaction.totalTax:0.000}% {Environment.NewLine}";
                 if (transaction.summary?.Any() ?? false)
                 {
                     testTaxResult = transaction.summary.Aggregate(testTaxResult, (resultString, rate) =>
-                        $"{resultString}Jurisdiction: {rate?.jurisName}, Tax rate: {(rate?.rate ?? 0) * 100:0.00}% {Environment.NewLine}");
+                        $"{resultString}Jurisdiction: {rate?.jurisName}, Tax rate: {(rate?.rate ?? 0) * 100:0.000}% {Environment.NewLine}");
                 }
                 _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Plugins.Tax.Avalara.TestTax.Success"));
             }

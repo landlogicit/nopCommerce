@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Web.Framework.Models;
+using Nop.Web.Framework.Mvc;
 using Nop.Web.Framework.Mvc.ModelBinding;
 
 namespace Nop.Plugin.Payments.PayPalCommerce.Models
@@ -45,6 +45,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Models
         public bool ClientId_OverrideForStore { get; set; }
 
         [NopResourceDisplayName("Plugins.Payments.PayPalCommerce.Fields.SecretKey")]
+        [NoTrim]
         [DataType(DataType.Password)]
         public string SecretKey { get; set; }
         public bool SecretKey_OverrideForStore { get; set; }
@@ -77,6 +78,10 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Models
         [NopResourceDisplayName("Plugins.Payments.PayPalCommerce.Fields.LogoInFooter")]
         public string LogoInFooter { get; set; }
         public bool LogoInFooter_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.PayPalCommerce.Fields.DisplayPayLaterMessages")]
+        public bool DisplayPayLaterMessages { get; set; }
+        public bool DisplayPayLaterMessages_OverrideForStore { get; set; }
 
         public OnboardingModel OnboardingModel { get; set; }
 

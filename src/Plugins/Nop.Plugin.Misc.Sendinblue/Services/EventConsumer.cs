@@ -1,10 +1,8 @@
-﻿using System.Threading.Tasks;
-using Nop.Core.Domain.Customers;
+﻿using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Messages;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Stores;
 using Nop.Core.Events;
-using Nop.Services.Common;
 using Nop.Services.Events;
 using Nop.Services.Messages;
 
@@ -26,21 +24,18 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
     {
         #region Fields
 
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly SendinblueManager _sendinblueEmailManager;
-        private readonly SendinblueMarketingAutomationManager _sendinblueMarketingAutomationManager;
+        protected readonly MarketingAutomationManager _marketingAutomationManager;
+        protected readonly SendinblueManager _sendinblueEmailManager;
 
         #endregion
 
         #region Ctor
 
-        public EventConsumer(IGenericAttributeService genericAttributeService,
-            SendinblueManager sendinblueEmailManager,
-            SendinblueMarketingAutomationManager sendinblueMarketingAutomationManager)
+        public EventConsumer(MarketingAutomationManager marketingAutomationManager,
+            SendinblueManager sendinblueEmailManager)
         {
-            _genericAttributeService = genericAttributeService;
+            _marketingAutomationManager = marketingAutomationManager;
             _sendinblueEmailManager = sendinblueEmailManager;
-            _sendinblueMarketingAutomationManager = sendinblueMarketingAutomationManager;
         }
 
         #endregion
@@ -77,7 +72,7 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
         public async Task HandleEventAsync(EntityInsertedEvent<ShoppingCartItem> eventMessage)
         {
             //handle event
-            await _sendinblueMarketingAutomationManager.HandleShoppingCartChangedEventAsync(eventMessage.Entity);
+            await _marketingAutomationManager.HandleShoppingCartChangedEventAsync(eventMessage.Entity);
         }
 
         /// <summary>
@@ -88,7 +83,7 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
         public async Task HandleEventAsync(EntityUpdatedEvent<ShoppingCartItem> eventMessage)
         {
             //handle event
-            await _sendinblueMarketingAutomationManager.HandleShoppingCartChangedEventAsync(eventMessage.Entity);
+            await _marketingAutomationManager.HandleShoppingCartChangedEventAsync(eventMessage.Entity);
         }
 
         /// <summary>
@@ -99,7 +94,7 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
         public async Task HandleEventAsync(EntityDeletedEvent<ShoppingCartItem> eventMessage)
         {
             //handle event
-            await _sendinblueMarketingAutomationManager.HandleShoppingCartChangedEventAsync(eventMessage.Entity);
+            await _marketingAutomationManager.HandleShoppingCartChangedEventAsync(eventMessage.Entity);
         }
 
         /// <summary>
@@ -110,7 +105,7 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
         public async Task HandleEventAsync(OrderPaidEvent eventMessage)
         {
             //handle event
-            await _sendinblueMarketingAutomationManager.HandleOrderCompletedEventAsync(eventMessage.Order);
+            await _marketingAutomationManager.HandleOrderCompletedEventAsync(eventMessage.Order);
             await _sendinblueEmailManager.UpdateContactAfterCompletingOrderAsync(eventMessage.Order);
         }
 
@@ -122,7 +117,7 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
         public async Task HandleEventAsync(OrderPlacedEvent eventMessage)
         {
             //handle event
-            await _sendinblueMarketingAutomationManager.HandleOrderPlacedEventAsync(eventMessage.Order);
+            await _marketingAutomationManager.HandleOrderPlacedEventAsync(eventMessage.Order);
         }
 
         /// <summary>
@@ -143,11 +138,12 @@ namespace Nop.Plugin.Misc.Sendinblue.Services
         /// </summary>
         /// <param name="eventMessage">The event message.</param>
         /// <returns>A task that represents the asynchronous operation</returns>
-        public async Task HandleEventAsync(EntityTokensAddedEvent<Customer, Token> eventMessage)
+        public Task HandleEventAsync(EntityTokensAddedEvent<Customer, Token> eventMessage)
         {
             //handle event
-            var phone = await _genericAttributeService.GetAttributeAsync<string>(eventMessage.Entity, NopCustomerDefaults.PhoneAttribute);
-            eventMessage.Tokens.Add(new Token("Customer.PhoneNumber", phone));
+            eventMessage.Tokens.Add(new Token("Customer.PhoneNumber", eventMessage.Entity.Phone));
+
+            return Task.CompletedTask;
         }
 
         #endregion

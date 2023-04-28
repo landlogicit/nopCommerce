@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Web.Areas.Admin.Models.Common;
-using Nop.Web.Framework.Mvc.ModelBinding;
 using Nop.Web.Framework.Models;
+using Nop.Web.Framework.Mvc.ModelBinding;
 
 namespace Nop.Web.Areas.Admin.Models.Settings
 {
@@ -75,7 +74,7 @@ namespace Nop.Web.Areas.Admin.Models.Settings
 
         public AddressModel DefaultTaxAddress { get; set; }
         public bool DefaultTaxAddress_OverrideForStore { get; set; }
-       
+
         [NopResourceDisplayName("Admin.Configuration.Settings.Tax.ShippingIsTaxable")]
         public bool ShippingIsTaxable { get; set; }
         public bool ShippingIsTaxable_OverrideForStore { get; set; }
@@ -103,6 +102,10 @@ namespace Nop.Web.Areas.Admin.Models.Settings
         [NopResourceDisplayName("Admin.Configuration.Settings.Tax.EuVatEnabled")]
         public bool EuVatEnabled { get; set; }
         public bool EuVatEnabled_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Admin.Configuration.Settings.Tax.EuVatEnabledForGuests")]
+        public bool EuVatEnabledForGuests { get; set; }
+        public bool EuVatEnabledForGuests_OverrideForStore { get; set; }
 
         [NopResourceDisplayName("Admin.Configuration.Settings.Tax.EuVatShopCountry")]
         public int EuVatShopCountryId { get; set; }

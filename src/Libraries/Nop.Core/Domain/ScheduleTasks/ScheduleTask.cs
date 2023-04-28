@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Nop.Core.Domain.ScheduleTasks
+﻿namespace Nop.Core.Domain.ScheduleTasks
 {
     /// <summary>
     /// Schedule task
@@ -21,6 +19,11 @@ namespace Nop.Core.Domain.ScheduleTasks
         /// Gets or sets the type of appropriate IScheduleTask class
         /// </summary>
         public string Type { get; set; }
+
+        /// <summary>
+        /// Gets or sets the datetime when task was enabled last time
+        /// </summary>
+        public DateTime? LastEnabledUtc { get; set; }
 
         /// <summary>
         /// Gets or sets the value indicating whether a task is enabled

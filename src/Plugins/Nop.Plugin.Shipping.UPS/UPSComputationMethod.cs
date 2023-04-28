@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Nop.Core;
+﻿using Nop.Core;
 using Nop.Plugin.Shipping.UPS.Domain;
 using Nop.Plugin.Shipping.UPS.Services;
 using Nop.Services.Configuration;
@@ -20,10 +16,10 @@ namespace Nop.Plugin.Shipping.UPS
     {
         #region Fields
 
-        private readonly ILocalizationService _localizationService;
-        private readonly ISettingService _settingService;
-        private readonly IWebHelper _webHelper;
-        private readonly UPSService _upsService;
+        protected readonly ILocalizationService _localizationService;
+        protected readonly ISettingService _settingService;
+        protected readonly IWebHelper _webHelper;
+        protected readonly UPSService _upsService;
 
         #endregion
 
@@ -77,6 +73,18 @@ namespace Nop.Plugin.Shipping.UPS
         public Task<decimal?> GetFixedRateAsync(GetShippingOptionRequest getShippingOptionRequest)
         {
             return Task.FromResult<decimal?>(null);
+        }
+
+        /// <summary>
+        /// Get associated shipment tracker
+        /// </summary>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the shipment tracker
+        /// </returns>
+        public Task<IShipmentTracker> GetShipmentTrackerAsync()
+        {
+            return Task.FromResult<IShipmentTracker>(new UPSShipmentTracker(_upsService));
         }
 
         /// <summary>
@@ -177,15 +185,6 @@ namespace Nop.Plugin.Shipping.UPS
 
             await base.UninstallAsync();
         }
-
-        #endregion
-
-        #region Properties
-
-        /// <summary>
-        /// Gets a shipment tracker
-        /// </summary>
-        public IShipmentTracker ShipmentTracker => new UPSShipmentTracker(_upsService);
 
         #endregion
     }

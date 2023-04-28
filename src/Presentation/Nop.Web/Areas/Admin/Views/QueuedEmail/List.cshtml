@@ -4,7 +4,7 @@
     //page title
     ViewBag.PageTitle = T("Admin.System.QueuedEmails").Text;
     //active menu item (system name)
-    Html.SetActiveMenuItemSystemName("Queued emails");
+    NopHtml.SetActiveMenuItemSystemName("Queued emails");
 }
 
 @{
@@ -28,7 +28,7 @@
                 @T("Admin.System.QueuedEmails.DeleteAll")
             </button>
             <nop-action-confirmation asp-button-id="delete-all" />
-            @await Component.InvokeAsync("AdminWidget", new { widgetZone = AdminWidgetZones.QueuedEmailListButtons, additionalData = Model })
+            @await Component.InvokeAsync(typeof(AdminWidgetViewComponent), new { widgetZone = AdminWidgetZones.QueuedEmailListButtons, additionalData = Model })
         </div>
     </div>
 

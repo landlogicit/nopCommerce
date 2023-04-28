@@ -1,19 +1,16 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Gdpr;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Events;
+using Nop.Services.Attributes;
 using Nop.Services.Catalog;
 using Nop.Services.Common;
 using Nop.Services.Customers;
 using Nop.Services.Events;
 using Nop.Services.Localization;
-using Nop.Services.Orders;
 using Nop.Services.Security;
 using Nop.Services.Tax;
 using Nop.Web.Areas.Admin.Models.Catalog;
@@ -34,24 +31,24 @@ namespace Nop.Plugin.Tax.Avalara.Services
         IConsumer<EntityDeletedEvent<Order>>,
         IConsumer<ModelPreparedEvent<BaseNopModel>>,
         IConsumer<ModelReceivedEvent<BaseNopModel>>,
-        IConsumer<OrderCancelledEvent>,
+        IConsumer<OrderStatusChangedEvent>,
         IConsumer<OrderPlacedEvent>,
         IConsumer<OrderRefundedEvent>,
         IConsumer<OrderVoidedEvent>
     {
         #region Fields
 
-        private readonly AvalaraTaxManager _avalaraTaxManager;
-        private readonly AvalaraTaxSettings _avalaraTaxSettings;
-        private readonly ICheckoutAttributeService _checkoutAttributeService;
-        private readonly ICustomerService _customerService;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ILocalizationService _localizationService;
-        private readonly IPermissionService _permissionService;
-        private readonly IProductService _productService;
-        private readonly ITaxPluginManager _taxPluginManager;
-        private readonly IWorkContext _workContext;
+        protected readonly AvalaraTaxManager _avalaraTaxManager;
+        protected readonly AvalaraTaxSettings _avalaraTaxSettings;
+        protected readonly IAttributeService<CheckoutAttribute, CheckoutAttributeValue> _checkoutAttributeService;
+        protected readonly ICustomerService _customerService;
+        protected readonly IGenericAttributeService _genericAttributeService;
+        protected readonly IHttpContextAccessor _httpContextAccessor;
+        protected readonly ILocalizationService _localizationService;
+        protected readonly IPermissionService _permissionService;
+        protected readonly IProductService _productService;
+        protected readonly ITaxPluginManager _taxPluginManager;
+        protected readonly IWorkContext _workContext;
 
         #endregion
 
@@ -59,7 +56,7 @@ namespace Nop.Plugin.Tax.Avalara.Services
 
         public EventConsumer(AvalaraTaxManager avalaraTaxManager,
             AvalaraTaxSettings avalaraTaxSettings,
-            ICheckoutAttributeService checkoutAttributeService,
+            IAttributeService<CheckoutAttribute, CheckoutAttributeValue> checkoutAttributeService,
             ICustomerService customerService,
             IGenericAttributeService genericAttributeService,
             IHttpContextAccessor httpContextAccessor,
@@ -155,16 +152,13 @@ namespace Nop.Plugin.Tax.Avalara.Services
                         return;
                 }
 
-                var infoItem = navigationModel.CustomerNavigationItems.FirstOrDefault(item => item.Tab == CustomerNavigationEnum.Info);
+                var infoItem = navigationModel.CustomerNavigationItems.FirstOrDefault(item => item.Tab == (int)CustomerNavigationEnum.Info);
                 var position = navigationModel.CustomerNavigationItems.IndexOf(infoItem) + 1;
                 navigationModel.CustomerNavigationItems.Insert(position, new CustomerNavigationItemModel
                 {
                     RouteName = AvalaraTaxDefaults.ExemptionCertificatesRouteName,
                     ItemClass = AvalaraTaxDefaults.ExemptionCertificatesMenuClassName,
-
-                    //since we can neither extend enum nor use the default value (e.g. null or 0), we set the least used element
-                    //Tab = AvalaraTaxDefaults.ExemptionCertificatesMenuTab,
-                    Tab = CustomerNavigationEnum.ForumSubscriptions,
+                    Tab = AvalaraTaxDefaults.ExemptionCertificatesMenuTab,
                     Title = await _localizationService.GetResourceAsync("Plugins.Tax.Avalara.ExemptionCertificates")
                 });
             }
@@ -186,7 +180,7 @@ namespace Nop.Plugin.Tax.Avalara.Services
                 CustomerModel customerModel => (BaseEntity)await _customerService.GetCustomerByIdAsync(customerModel.Id),
                 CustomerRoleModel customerRoleModel => await _customerService.GetCustomerRoleByIdAsync(customerRoleModel.Id),
                 ProductModel productModel => await _productService.GetProductByIdAsync(productModel.Id),
-                CheckoutAttributeModel checkoutAttributeModel => await _checkoutAttributeService.GetCheckoutAttributeByIdAsync(checkoutAttributeModel.Id),
+                CheckoutAttributeModel checkoutAttributeModel => await _checkoutAttributeService.GetAttributeByIdAsync(checkoutAttributeModel.Id),
                 _ => null
             };
             if (entity == null)
@@ -247,7 +241,7 @@ namespace Nop.Plugin.Tax.Avalara.Services
         }
 
         /// <summary>
-        /// Handle order async Tasked event
+        /// Handle order voided event
         /// </summary>
         /// <param name="eventMessage">Event message</param>
         /// <returns>A task that represents the asynchronous operation</returns>
@@ -260,7 +254,7 @@ namespace Nop.Plugin.Tax.Avalara.Services
             if (!await _taxPluginManager.IsPluginActiveAsync(AvalaraTaxDefaults.SystemName))
                 return;
 
-            //async Task tax transaction
+            //void tax transaction
             await _avalaraTaxManager.VoidTaxTransactionAsync(eventMessage.Order);
         }
 
@@ -269,16 +263,19 @@ namespace Nop.Plugin.Tax.Avalara.Services
         /// </summary>
         /// <param name="eventMessage">Event message</param>
         /// <returns>A task that represents the asynchronous operation</returns>
-        public async Task HandleEventAsync(OrderCancelledEvent eventMessage)
+        public async Task HandleEventAsync(OrderStatusChangedEvent eventMessage)
         {
             if (eventMessage.Order == null)
+                return;
+
+            if (eventMessage.Order.OrderStatus != OrderStatus.Cancelled)
                 return;
 
             //ensure that Avalara tax provider is active
             if (!await _taxPluginManager.IsPluginActiveAsync(AvalaraTaxDefaults.SystemName))
                 return;
 
-            //async Task tax transaction
+            //void tax transaction
             await _avalaraTaxManager.VoidTaxTransactionAsync(eventMessage.Order);
         }
 

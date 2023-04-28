@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Services.Customers;
 using Nop.Web.Framework.Components;
@@ -10,14 +8,13 @@ namespace Nop.Plugin.Misc.Sendinblue.Components
     /// <summary>
     /// Represents view component to embed tracking script on pages
     /// </summary>
-    [ViewComponent(Name = SendinblueDefaults.TRACKING_VIEW_COMPONENT_NAME)]
     public class WidgetsSendinblueViewComponent : NopViewComponent
     {
         #region Fields
 
-        private readonly ICustomerService _customerService;
-        private readonly IWorkContext _workContext;
-        private readonly SendinblueSettings _sendinblueSettings;
+        protected readonly ICustomerService _customerService;
+        protected readonly IWorkContext _workContext;
+        protected readonly SendinblueSettings _sendinblueSettings;
 
         #endregion
 
@@ -54,8 +51,9 @@ namespace Nop.Plugin.Misc.Sendinblue.Components
                 return Content(trackingScript);
 
             //get customer email
-            var customerEmail = !await _customerService.IsGuestAsync(await _workContext.GetCurrentCustomerAsync())
-                ? (await _workContext.GetCurrentCustomerAsync()).Email?.Replace("'", "\\'")
+            var customer = await _workContext.GetCurrentCustomerAsync();
+            var customerEmail = !await _customerService.IsGuestAsync(customer)
+                ? customer.Email?.Replace("'", "\\'")
                 : string.Empty;
 
             //prepare tracking script

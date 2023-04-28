@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Nop.Core.Domain.Catalog;
+﻿using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Discounts;
 using Nop.Core.Domain.Orders;
+using Nop.Core.Domain.Stores;
 
 namespace Nop.Services.Orders
 {
@@ -80,6 +78,7 @@ namespace Nop.Services.Orders
         /// <param name="attributesXml">Attributes in XML format</param>
         /// <param name="ignoreNonCombinableAttributes">A value indicating whether we should ignore non-combinable attributes</param>
         /// <param name="ignoreConditionMet">A value indicating whether we should ignore filtering by "is condition met" property</param>
+        /// <param name="ignoreBundledProducts">A value indicating whether we should ignore bundled (associated) products</param>
         /// <param name="shoppingCartItemId">Shopping cart identifier; pass 0 if it's a new item</param> 
         /// <returns>
         /// A task that represents the asynchronous operation
@@ -91,7 +90,9 @@ namespace Nop.Services.Orders
             int quantity = 1,
             string attributesXml = "",
             bool ignoreNonCombinableAttributes = false,
-            bool ignoreConditionMet = false, int shoppingCartItemId = 0);
+            bool ignoreConditionMet = false,
+            bool ignoreBundledProducts = false,
+            int shoppingCartItemId = 0);
 
         /// <summary>
         /// Validates shopping cart item (gift card)
@@ -194,6 +195,7 @@ namespace Nop.Services.Orders
         /// </returns>
         Task<(decimal unitPrice, decimal discountAmount, List<Discount> appliedDiscounts)> GetUnitPriceAsync(Product product,
             Customer customer,
+            Store store,
             ShoppingCartType shoppingCartType,
             int quantity,
             string attributesXml,
@@ -213,7 +215,6 @@ namespace Nop.Services.Orders
         Task<(decimal subTotal, decimal discountAmount, List<Discount> appliedDiscounts, int? maximumDiscountQty)> GetSubTotalAsync(ShoppingCartItem shoppingCartItem,
             bool includeDiscounts);
 
-        //TODO: migrate to an extension method
         /// <summary>
         /// Finds a shopping cart item in the cart
         /// </summary>

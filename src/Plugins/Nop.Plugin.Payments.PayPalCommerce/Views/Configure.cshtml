@@ -1,14 +1,22 @@
 ﻿@model ConfigurationModel
+@using Nop.Web.Framework.Models.AdminAreaTour
 
 @{
     Layout = "_ConfigurePlugin";
+
+    //tour step
+    ViewBag.TourStep = TourStep.PaymentPayPal;
+
+    var learnMore = "<p>Learn more about the PayPal Commerce plugin configuration <a href='https://docs.nopcommerce.com/getting-started/configure-payments/payment-methods/paypal-commerce.html' target='_blank'>here</a>.</p>";
 }
 
-@await Component.InvokeAsync("StoreScopeConfiguration")
+@await Html.PartialAsync("_AdminTour")
+
+@await Component.InvokeAsync(typeof(StoreScopeConfigurationViewComponent))
 
 @if (Model.IsConfigured)
 {
-    @await Component.InvokeAsync("SettingMode")
+    @await Component.InvokeAsync(typeof(SettingModeViewComponent))
 }
 
 <script>
@@ -24,7 +32,10 @@
             $('#pnlDescription').showElement();
             @if (!Model.IsConfigured)
             {
-                <text>$('#pnlSave').showElement();</text>
+                <text>
+                    $('#pnlSave').showElement();
+                    $('#pnlLearnMore').showElement();
+                </text>
             }
         }
         else {
@@ -33,7 +44,10 @@
             $('#pnlDescription').hideElement();
             @if (!Model.IsConfigured)
             {
-                <text>$('#pnlSave').hideElement();</text>
+                <text>
+                    $('#pnlSave').hideElement();
+                    $('#pnlLearnMore').hideElement();
+                </text>
             }
         }
     }
@@ -125,7 +139,7 @@
                                 function onboardedCallback(authCode, sharedId) {
                                     var postData = {
                                         MerchantGuid: '@Model.OnboardingModel.MerchantGuid',
-                                        Email_OverrideForStore: '@Model.Email_OverrideForStore.ToString().ToLower()',
+                                        Email_OverrideForStore: '@Model.Email_OverrideForStore.ToString().ToLowerInvariant()',
                                         SharedId: sharedId,
                                         AuthCode: authCode
                                     };
@@ -145,6 +159,11 @@
                                 @T("Plugins.Payments.PayPalCommerce.Onboarding.ButtonRevoke")
                             </button>
                         }
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-12">
+                        @Html.Raw(learnMore)
                     </div>
                 </div>
             </div>
@@ -172,7 +191,7 @@
                         <span asp-validation-for="SetCredentialsManually"></span>
                     </div>
                 </div>
-                <nop-nested-setting asp-for="SetCredentialsManually" id="pnlCredentials">
+                <nop-nested-setting asp-for="SetCredentialsManually" id="pnlCredentials" disable-auto-generation="true">
                     <div class="form-group row">
                         <div class="col-md-3">
                             <nop-override-store-checkbox asp-for="UseSandbox_OverrideForStore" asp-input="UseSandbox" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
@@ -220,32 +239,6 @@
                         <div class="card-header">
                             @T("Plugins.Payments.PayPalCommerce.Prominently")
                         </div>
-
-                        <script>
-                            $(document).ready(function () {
-                                $("#@Html.IdFor(model => model.DisplayLogoInHeaderLinks)").click(toggleDisplayLogo);
-                                $("#@Html.IdFor(model => model.DisplayLogoInFooter)").click(toggleDisplayLogo);
-
-                                toggleDisplayLogo();
-                            });
-
-                            function toggleDisplayLogo() {
-                                if ($('#@Html.IdFor(model => model.DisplayLogoInHeaderLinks)').is(':checked')) {
-                                    $('#pnlLogoInHeaderLinks').showElement();
-                                }
-                                else {
-                                    $('#pnlLogoInHeaderLinks').hideElement();
-                                }
-
-                                if ($('#@Html.IdFor(model => model.DisplayLogoInFooter)').is(':checked')) {
-                                    $('#pnlLogoInFooter').showElement();
-                                }
-                                else {
-                                    $('#pnlLogoInFooter').hideElement();
-                                }
-                            }
-                        </script>
-
                         <div class="card-body">
                             <p>
                                 Build customer trust with PayPal branding on your website.<br />
@@ -275,6 +268,16 @@
                             </div>
                             <div class="form-group row advanced-setting">
                                 <div class="col-md-3">
+                                    <nop-override-store-checkbox asp-for="DisplayPayLaterMessages_OverrideForStore" asp-input="DisplayPayLaterMessages" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                                    <nop-label asp-for="DisplayPayLaterMessages" />
+                                </div>
+                                <div class="col-md-9">
+                                    <nop-editor asp-for="DisplayPayLaterMessages" />
+                                    <span asp-validation-for="DisplayPayLaterMessages"></span>
+                                </div>
+                            </div>
+                            <div class="form-group row advanced-setting">
+                                <div class="col-md-3">
                                     <nop-override-store-checkbox asp-for="DisplayLogoInHeaderLinks_OverrideForStore" asp-input="DisplayLogoInHeaderLinks" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                                     <nop-label asp-for="DisplayLogoInHeaderLinks" />
                                 </div>
@@ -284,7 +287,7 @@
                                 </div>
                             </div>
                             <nop-nested-setting asp-for="DisplayLogoInHeaderLinks">
-                                <div class="form-group row advanced-setting" id="pnlLogoInHeaderLinks">
+                                <div class="form-group row advanced-setting">
                                     <div class="col-md-3">
                                         <nop-override-store-checkbox asp-for="LogoInHeaderLinks_OverrideForStore" asp-input="LogoInHeaderLinks" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                                         <nop-label asp-for="LogoInHeaderLinks" />
@@ -306,7 +309,7 @@
                                 </div>
                             </div>
                             <nop-nested-setting asp-for="DisplayLogoInFooter">
-                                <div class="form-group row advanced-setting" id="pnlLogoInFooter">
+                                <div class="form-group row advanced-setting">
                                     <div class="col-md-3">
                                         <nop-override-store-checkbox asp-for="LogoInFooter_OverrideForStore" asp-input="LogoInFooter" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                                         <nop-label asp-for="LogoInFooter" />
@@ -324,6 +327,11 @@
                 <div class="form-group row" id="pnlSave">
                     <div class="col-md-9 offset-md-3">
                         <button type="submit" name="save" class="btn btn-primary">@T("Admin.Common.Save")</button>
+                    </div>
+                </div>
+                <div class="form-group row" id="pnlLearnMore">
+                    <div class="col-12">
+                        @Html.Raw(learnMore)
                     </div>
                 </div>
             </div>

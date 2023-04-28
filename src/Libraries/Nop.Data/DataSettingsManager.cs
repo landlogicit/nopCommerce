@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 using Newtonsoft.Json;
 using Nop.Core;
 using Nop.Core.Configuration;
@@ -21,7 +17,7 @@ namespace Nop.Data
         /// <summary>
         /// Gets a cached value indicating whether the database is installed. We need this value invariable during installation process
         /// </summary>
-        private static bool? _databaseIsInstalled;
+        protected static bool? _databaseIsInstalled;
 
         #endregion
 
@@ -58,7 +54,7 @@ namespace Nop.Data
                         dataSettings.ConnectionString = value;
                         continue;
                     case "SQLCommandTimeout":
-                        //If parsing isn't successful, we set a negative timeout, that means the current provider will usе a default value
+                        //If parsing isn't successful, we set a negative timeout, that means the current provider will use a default value
                         dataSettings.SQLCommandTimeout = int.TryParse(value, out var timeout) ? timeout : -1;
                         continue;
                     default:
@@ -99,46 +95,11 @@ namespace Nop.Data
         /// Load data settings
         /// </summary>
         /// <param name="fileProvider">File provider</param>
-        /// <returns>
-        /// A task that represents the asynchronous operation
-        /// The task result contains the data settings
-        /// </returns>
-        public static async Task<DataConfig> LoadSettingsAsync(INopFileProvider fileProvider = null)
-        {
-            if (Singleton<DataConfig>.Instance is not null)
-                return Singleton<DataConfig>.Instance;
-
-            //backward compatibility
-            fileProvider ??= CommonHelper.DefaultFileProvider;
-            var filePath_json = fileProvider.MapPath(NopDataSettingsDefaults.FilePath);
-            var filePath_txt = fileProvider.MapPath(NopDataSettingsDefaults.ObsoleteFilePath);
-            if (fileProvider.FileExists(filePath_json) || fileProvider.FileExists(filePath_txt))
-            {
-                var dataSettings = fileProvider.FileExists(filePath_json)
-                    ? LoadDataSettingsFromOldJsonFile(await fileProvider.ReadAllTextAsync(filePath_json, Encoding.UTF8))
-                    : LoadDataSettingsFromOldTxtFile(await fileProvider.ReadAllTextAsync(filePath_txt, Encoding.UTF8))
-                    ?? new DataConfig();
-
-                fileProvider.DeleteFile(filePath_json);
-                fileProvider.DeleteFile(filePath_txt);
-
-                SaveSettings(dataSettings, fileProvider);
-                Singleton<DataConfig>.Instance = dataSettings;
-            }
-            else
-                Singleton<DataConfig>.Instance = Singleton<AppSettings>.Instance.Get<DataConfig>();
-
-            return Singleton<DataConfig>.Instance;
-        }
-
-        /// <summary>
-        /// Load data settings
-        /// </summary>
-        /// <param name="fileProvider">File provider</param>
+        /// <param name="reload">Force loading settings from disk</param>
         /// <returns>Data settings</returns>
-        public static DataConfig LoadSettings(INopFileProvider fileProvider = null)
+        public static DataConfig LoadSettings(INopFileProvider fileProvider = null, bool reload = false)
         {
-            if (Singleton<DataConfig>.Instance is not null)
+            if (!reload && Singleton<DataConfig>.Instance is not null)
                 return Singleton<DataConfig>.Instance;
 
             //backward compatibility
@@ -155,11 +116,13 @@ namespace Nop.Data
                 fileProvider.DeleteFile(filePath_json);
                 fileProvider.DeleteFile(filePath_txt);
 
-                SaveSettings(dataSettings, fileProvider);
+                AppSettingsHelper.SaveAppSettings(new List<IConfig> { dataSettings }, fileProvider);
                 Singleton<DataConfig>.Instance = dataSettings;
             }
             else
+            {
                 Singleton<DataConfig>.Instance = Singleton<AppSettings>.Instance.Get<DataConfig>();
+            }
 
             return Singleton<DataConfig>.Instance;
         }
@@ -171,19 +134,8 @@ namespace Nop.Data
         /// <param name="fileProvider">File provider</param>
         public static void SaveSettings(DataConfig dataSettings, INopFileProvider fileProvider)
         {
-            Singleton<DataConfig>.Instance = null;
             AppSettingsHelper.SaveAppSettings(new List<IConfig> { dataSettings }, fileProvider);
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether database is already installed
-        /// </summary>
-        /// <returns>A task that represents the asynchronous operation</returns>
-        public static async Task<bool> IsDatabaseInstalledAsync()
-        {
-            _databaseIsInstalled ??= !string.IsNullOrEmpty((await LoadSettingsAsync())?.ConnectionString);
-
-            return _databaseIsInstalled.Value;
+            LoadSettings(fileProvider, reload: true);
         }
 
         /// <summary>
@@ -194,18 +146,6 @@ namespace Nop.Data
             _databaseIsInstalled ??= !string.IsNullOrEmpty(LoadSettings()?.ConnectionString);
 
             return _databaseIsInstalled.Value;
-        }
-
-        /// <summary>
-        /// Gets the command execution timeout.
-        /// </summary>
-        /// <value>
-        /// Number of seconds. Negative timeout value means that a default timeout will be used. 0 timeout value corresponds to infinite timeout.
-        /// </value>
-        /// <returns>A task that represents the asynchronous operation</returns>
-        public static async Task<int> GetSqlCommandTimeoutAsync()
-        {
-            return (await LoadSettingsAsync())?.SQLCommandTimeout ?? -1;
         }
 
         /// <summary>

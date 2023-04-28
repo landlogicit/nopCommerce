@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -13,6 +10,7 @@ using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Http.Extensions;
+using Nop.Plugin.Payments.PayPalCommerce.Components;
 using Nop.Plugin.Payments.PayPalCommerce.Domain;
 using Nop.Plugin.Payments.PayPalCommerce.Models;
 using Nop.Plugin.Payments.PayPalCommerce.Services;
@@ -35,19 +33,19 @@ namespace Nop.Plugin.Payments.PayPalCommerce
     {
         #region Fields
 
-        private readonly CurrencySettings _currencySettings;
-        private readonly IActionContextAccessor _actionContextAccessor;
-        private readonly ICurrencyService _currencyService;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly ILocalizationService _localizationService;
-        private readonly IPaymentService _paymentService;
-        private readonly ISettingService _settingService;
-        private readonly IStoreService _storeService;
-        private readonly IUrlHelperFactory _urlHelperFactory;
-        private readonly PaymentSettings _paymentSettings;
-        private readonly PayPalCommerceSettings _settings;
-        private readonly ServiceManager _serviceManager;
-        private readonly WidgetSettings _widgetSettings;
+        protected readonly CurrencySettings _currencySettings;
+        protected readonly IActionContextAccessor _actionContextAccessor;
+        protected readonly ICurrencyService _currencyService;
+        protected readonly IGenericAttributeService _genericAttributeService;
+        protected readonly ILocalizationService _localizationService;
+        protected readonly IPaymentService _paymentService;
+        protected readonly ISettingService _settingService;
+        protected readonly IStoreService _storeService;
+        protected readonly IUrlHelperFactory _urlHelperFactory;
+        protected readonly PaymentSettings _paymentSettings;
+        protected readonly PayPalCommerceSettings _settings;
+        protected readonly ServiceManager _serviceManager;
+        protected readonly WidgetSettings _widgetSettings;
 
         #endregion
 
@@ -352,14 +350,14 @@ namespace Nop.Plugin.Payments.PayPalCommerce
         /// A task that represents the asynchronous operation
         /// The task result contains the payment info holder
         /// </returns>
-        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
+        public async Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
             if (form == null)
                 throw new ArgumentNullException(nameof(form));
 
             //already set
-            return Task.FromResult(_actionContextAccessor.ActionContext.HttpContext.Session
-                .Get<ProcessPaymentRequest>(PayPalCommerceDefaults.PaymentRequestSessionKey));
+            return await _actionContextAccessor.ActionContext.HttpContext.Session
+                .GetAsync<ProcessPaymentRequest>(PayPalCommerceDefaults.PaymentRequestSessionKey);
         }
 
         /// <summary>
@@ -373,9 +371,9 @@ namespace Nop.Plugin.Payments.PayPalCommerce
         /// <summary>
         /// Gets a view component for displaying plugin in public store ("payment info" checkout step)
         /// </summary>
-        public string GetPublicViewComponentName()
+        public Type GetPublicViewComponent()
         {
-            return PayPalCommerceDefaults.PAYMENT_INFO_VIEW_COMPONENT_NAME;
+            return typeof(PaymentInfoViewComponent);
         }
 
         /// <summary>
@@ -401,11 +399,11 @@ namespace Nop.Plugin.Payments.PayPalCommerce
         }
 
         /// <summary>
-        /// Gets a name of a view component for displaying widget
+        /// Gets a type of a view component for displaying widget
         /// </summary>
         /// <param name="widgetZone">Name of the widget zone</param>
-        /// <returns>View component name</returns>
-        public string GetWidgetViewComponentName(string widgetZone)
+        /// <returns>View component type</returns>
+        public Type GetWidgetViewComponent(string widgetZone)
         {
             if (widgetZone == null)
                 throw new ArgumentNullException(nameof(widgetZone));
@@ -415,16 +413,16 @@ namespace Nop.Plugin.Payments.PayPalCommerce
                 widgetZone.Equals(PublicWidgetZones.ProductDetailsTop) ||
                 widgetZone.Equals(PublicWidgetZones.OrderSummaryContentBefore))
             {
-                return PayPalCommerceDefaults.SCRIPT_VIEW_COMPONENT_NAME;
+                return typeof(ScriptViewComponent);
             }
 
             if (widgetZone.Equals(PublicWidgetZones.ProductDetailsAddInfo) || widgetZone.Equals(PublicWidgetZones.OrderSummaryContentAfter))
-                return PayPalCommerceDefaults.BUTTONS_VIEW_COMPONENT_NAME;
+                return typeof(ButtonsViewComponent);
 
             if (widgetZone.Equals(PublicWidgetZones.HeaderLinksBefore) || widgetZone.Equals(PublicWidgetZones.Footer))
-                return PayPalCommerceDefaults.LOGO_VIEW_COMPONENT_NAME;
+                return typeof(LogoViewComponent);
 
-            return string.Empty;
+            return null;
         }
 
         /// <summary>
@@ -445,7 +443,9 @@ namespace Nop.Plugin.Payments.PayPalCommerce
                 StyleLabel = "paypal",
                 DisplayButtonsOnProductDetails = true,
                 DisplayButtonsOnShoppingCart = true,
-                RequestTimeout = PayPalCommerceDefaults.RequestTimeout
+                DisplayPayLaterMessages = false,
+                RequestTimeout = PayPalCommerceDefaults.RequestTimeout,
+                MinDiscountAmount = 0.5M
             });
 
             if (!_paymentSettings.ActivePaymentMethodSystemNames.Contains(PayPalCommerceDefaults.SystemName))
@@ -479,6 +479,8 @@ namespace Nop.Plugin.Payments.PayPalCommerce
                 ["Plugins.Payments.PayPalCommerce.Fields.DisplayLogoInFooter.Hint"] = "Determine whether to display PayPal logo in the footer. These logos and banners are a great way to let your buyers know that you choose PayPal to securely process their payments.",
                 ["Plugins.Payments.PayPalCommerce.Fields.DisplayLogoInHeaderLinks"] = "Display logo in header links",
                 ["Plugins.Payments.PayPalCommerce.Fields.DisplayLogoInHeaderLinks.Hint"] = "Determine whether to display PayPal logo in header links. These logos and banners are a great way to let your buyers know that you choose PayPal to securely process their payments.",
+                ["Plugins.Payments.PayPalCommerce.Fields.DisplayPayLaterMessages"] = "Display Pay Later messages",
+                ["Plugins.Payments.PayPalCommerce.Fields.DisplayPayLaterMessages.Hint"] = "Determine whether to display Pay Later messages. This message displays how much the customer pays in four payments. The message will be shown next to the PayPal buttons.",
                 ["Plugins.Payments.PayPalCommerce.Fields.Email"] = "Email",
                 ["Plugins.Payments.PayPalCommerce.Fields.Email.Hint"] = "Enter your email to get access to PayPal payments.",
                 ["Plugins.Payments.PayPalCommerce.Fields.LogoInFooter"] = "Logo source code",
@@ -552,6 +554,28 @@ namespace Nop.Plugin.Payments.PayPalCommerce
             await _localizationService.DeleteLocaleResourcesAsync("Plugins.Payments.PayPalCommerce");
 
             await base.UninstallAsync();
+        }
+
+        /// <summary>
+        /// Update plugin
+        /// </summary>
+        /// <param name="currentVersion">Current version of plugin</param>
+        /// <param name="targetVersion">New version of plugin</param>
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task UpdateAsync(string currentVersion, string targetVersion)
+        {
+            var current = decimal.TryParse(currentVersion, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 1.00M;
+
+            //new setting added in 1.09
+            if (current < 1.09M)
+            {
+                var settings = await _settingService.LoadSettingAsync<PayPalCommerceSettings>();
+                if (!await _settingService.SettingExistsAsync(settings, setting => setting.MinDiscountAmount))
+                {
+                    settings.MinDiscountAmount = 0.5M;
+                    await _settingService.SaveSettingAsync(settings);
+                }
+            }
         }
 
         /// <summary>

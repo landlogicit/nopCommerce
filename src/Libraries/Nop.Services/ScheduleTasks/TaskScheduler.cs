@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Nop.Core;
 using Nop.Core.Configuration;
 using Nop.Core.Domain.ScheduleTasks;
@@ -54,7 +48,7 @@ namespace Nop.Services.ScheduleTasks
         /// </summary>
         public async Task InitializeAsync()
         {
-            if (!await DataSettingsManager.IsDatabaseInstalledAsync())
+            if (!DataSettingsManager.IsDatabaseInstalled())
                 return;
 
             if (_taskThreads.Any())
@@ -65,7 +59,9 @@ namespace Nop.Services.ScheduleTasks
                 .OrderBy(x => x.Seconds)
                 .ToList();
 
-            var scheduleTaskUrl = $"{_storeContext.GetCurrentStoreAsync().Result.Url.TrimEnd('/')}/{NopTaskDefaults.ScheduleTaskPath}";
+            var store = await _storeContext.GetCurrentStoreAsync();
+
+            var scheduleTaskUrl = $"{store.Url.TrimEnd('/')}/{NopTaskDefaults.ScheduleTaskPath}";
             var timeout = _appSettings.Get<CommonConfig>().ScheduleTaskRunTimeout;
 
             foreach (var scheduleTask in scheduleTasks)
@@ -82,6 +78,19 @@ namespace Nop.Services.ScheduleTasks
                 {
                     //seconds left since the last start
                     var secondsLeft = (DateTime.UtcNow - scheduleTask.LastStartUtc).Value.TotalSeconds;
+
+                    if (secondsLeft >= scheduleTask.Seconds)
+                        //run now (immediately)
+                        taskThread.InitSeconds = 0;
+                    else
+                        //calculate start time
+                        //and round it (so "ensureRunOncePerPeriod" parameter was fine)
+                        taskThread.InitSeconds = (int)(scheduleTask.Seconds - secondsLeft) + 1;
+                }
+                else if (scheduleTask.LastEnabledUtc.HasValue)
+                {
+                    //seconds left since the last enable
+                    var secondsLeft = (DateTime.UtcNow - scheduleTask.LastEnabledUtc).Value.TotalSeconds;
 
                     if (secondsLeft >= scheduleTask.Seconds)
                         //run now (immediately)
@@ -124,7 +133,7 @@ namespace Nop.Services.ScheduleTasks
         /// <summary>
         /// Represents task thread
         /// </summary>
-        protected class TaskThread : IDisposable
+        protected partial class TaskThread : IDisposable
         {
             #region Fields
 
@@ -155,7 +164,11 @@ namespace Nop.Services.ScheduleTasks
 
             #region Utilities
 
-            private async Task RunAsync()
+            /// <summary>
+            /// Run task
+            /// </summary>
+            /// <returns>A task that represents the asynchronous operation</returns>
+            protected virtual async Task RunAsync()
             {
                 if (Seconds <= 0)
                     return;
@@ -185,9 +198,10 @@ namespace Nop.Services.ScheduleTasks
                     var storeContext = EngineContext.Current.Resolve<IStoreContext>(scope);
 
                     var message = ex.InnerException?.GetType() == typeof(TaskCanceledException) ? await localizationService.GetResourceAsync("ScheduleTasks.TimeoutError") : ex.Message;
+                    var store = await storeContext.GetCurrentStoreAsync();
 
                     message = string.Format(await localizationService.GetResourceAsync("ScheduleTasks.Error"), _scheduleTask.Name,
-                        message, _scheduleTask.Type, (await storeContext.GetCurrentStoreAsync()).Name, _scheduleTaskUrl);
+                        message, _scheduleTask.Type, store.Name, _scheduleTaskUrl);
 
                     await logger.ErrorAsync(message, ex);
                 }
@@ -199,7 +213,11 @@ namespace Nop.Services.ScheduleTasks
                 IsRunning = false;
             }
 
-            private void TimerHandler(object state)
+            /// <summary>
+            /// Method that handles calls from a <see cref="T:System.Threading.Timer" />
+            /// </summary>
+            /// <param name="state">An object containing application-specific information relevant to the method invoked by this delegate</param>
+            protected void TimerHandler(object state)
             {
                 try
                 {
@@ -213,11 +231,30 @@ namespace Nop.Services.ScheduleTasks
                 }
                 finally
                 {
-                    if (RunOnlyOnce)
-                        Dispose();
-                    else
-                        _timer.Change(Interval, Interval);
+                    if (!_disposed && _timer != null)
+                    {
+                        if (RunOnlyOnce)
+                            Dispose();
+                        else
+                            _timer.Change(Interval, Interval);
+                    }
                 }
+            }
+
+            /// <summary>
+            /// Protected implementation of Dispose pattern.
+            /// </summary>
+            /// <param name="disposing">Specifies whether to disposing resources</param>
+            protected virtual void Dispose(bool disposing)
+            {
+                if (_disposed)
+                    return;
+
+                if (disposing)
+                    lock (this)
+                        _timer?.Dispose();
+
+                _disposed = true;
             }
 
             #endregion
@@ -231,19 +268,6 @@ namespace Nop.Services.ScheduleTasks
             {
                 Dispose(true);
                 GC.SuppressFinalize(this);
-            }
-
-            // Protected implementation of Dispose pattern.
-            protected virtual void Dispose(bool disposing)
-            {
-                if (_disposed)
-                    return;
-
-                if (disposing)
-                    lock (this)
-                        _timer?.Dispose();
-
-                _disposed = true;
             }
 
             /// <summary>
@@ -271,12 +295,12 @@ namespace Nop.Services.ScheduleTasks
             /// <summary>
             /// Get or sets a datetime when thread has been started
             /// </summary>
-            public DateTime StartedUtc { get; private set; }
+            public DateTime StartedUtc { get; protected set; }
 
             /// <summary>
             /// Get or sets a value indicating whether thread is running
             /// </summary>
-            public bool IsRunning { get; private set; }
+            public bool IsRunning { get; protected set; }
 
             /// <summary>
             /// Gets the interval (in milliseconds) at which to run the task

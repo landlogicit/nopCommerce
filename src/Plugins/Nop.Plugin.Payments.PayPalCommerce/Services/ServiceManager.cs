@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -13,7 +8,9 @@ using Newtonsoft.Json;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
+using Nop.Core.Domain.Orders;
 using Nop.Plugin.Payments.PayPalCommerce.Domain.Onboarding;
+using Nop.Services.Attributes;
 using Nop.Services.Catalog;
 using Nop.Services.Common;
 using Nop.Services.Directory;
@@ -27,6 +24,7 @@ using PayPalCheckoutSdk.Core;
 using PayPalCheckoutSdk.Orders;
 using PayPalCheckoutSdk.Payments;
 using PayPalHttp;
+using Order = PayPalCheckoutSdk.Orders.Order;
 
 namespace Nop.Plugin.Payments.PayPalCommerce.Services
 {
@@ -37,27 +35,27 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
     {
         #region Fields
 
-        private readonly CurrencySettings _currencySettings;
-        private readonly IActionContextAccessor _actionContextAccessor;
-        private readonly IAddressService _addresService;
-        private readonly ICheckoutAttributeParser _checkoutAttributeParser;
-        private readonly ICountryService _countryService;
-        private readonly ICurrencyService _currencyService;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly ILogger _logger;
-        private readonly IOrderProcessingService _orderProcessingService;
-        private readonly IOrderService _orderService;
-        private readonly IOrderTotalCalculationService _orderTotalCalculationService;
-        private readonly IProductService _productService;
-        private readonly IShoppingCartService _shoppingCartService;
-        private readonly IStateProvinceService _stateProvinceService;
-        private readonly IStoreContext _storeContext;
-        private readonly IStoreService _storeService;
-        private readonly ITaxService _taxService;
-        private readonly IUrlHelperFactory _urlHelperFactory;
-        private readonly IWebHelper _webHelper;
-        private readonly IWorkContext _workContext;
-        private readonly OnboardingHttpClient _onboardingHttpClient;
+        protected readonly CurrencySettings _currencySettings;
+        protected readonly IActionContextAccessor _actionContextAccessor;
+        protected readonly IAddressService _addresService;
+        protected readonly IAttributeParser<CheckoutAttribute, CheckoutAttributeValue> _checkoutAttributeParser;
+        protected readonly ICountryService _countryService;
+        protected readonly ICurrencyService _currencyService;
+        protected readonly IGenericAttributeService _genericAttributeService;
+        protected readonly ILogger _logger;
+        protected readonly IOrderProcessingService _orderProcessingService;
+        protected readonly IOrderService _orderService;
+        protected readonly IOrderTotalCalculationService _orderTotalCalculationService;
+        protected readonly IProductService _productService;
+        protected readonly IShoppingCartService _shoppingCartService;
+        protected readonly IStateProvinceService _stateProvinceService;
+        protected readonly IStoreContext _storeContext;
+        protected readonly IStoreService _storeService;
+        protected readonly ITaxService _taxService;
+        protected readonly IUrlHelperFactory _urlHelperFactory;
+        protected readonly IWebHelper _webHelper;
+        protected readonly IWorkContext _workContext;
+        protected readonly OnboardingHttpClient _onboardingHttpClient;
 
         #endregion
 
@@ -66,7 +64,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
         public ServiceManager(CurrencySettings currencySettings,
             IActionContextAccessor actionContextAccessor,
             IAddressService addresService,
-            ICheckoutAttributeParser checkoutAttributeParser,
+            IAttributeParser<CheckoutAttribute, CheckoutAttributeValue> checkoutAttributeParser,
             ICountryService countryService,
             ICurrencyService currencyService,
             IGenericAttributeService genericAttributeService,
@@ -121,7 +119,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
         /// A task that represents the asynchronous operation
         /// The task result contains the result; error message if exists
         /// </returns>
-        private async Task<(TResult Result, string Error)> HandleFunctionAsync<TResult>(Func<Task<TResult>> function)
+        protected async Task<(TResult Result, string Error)> HandleFunctionAsync<TResult>(Func<Task<TResult>> function)
         {
             try
             {
@@ -163,7 +161,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
         /// A task that represents the asynchronous operation
         /// The task result contains the result
         /// </returns>
-        private static async Task<TResult> HandleCheckoutRequestAsync<TRequest, TResult>(PayPalCommerceSettings settings, TRequest request)
+        protected static async Task<TResult> HandleCheckoutRequestAsync<TRequest, TResult>(PayPalCommerceSettings settings, TRequest request)
             where TRequest : HttpRequest where TResult : class
         {
             //prepare common request params
@@ -200,7 +198,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
         /// A task that represents the asynchronous operation
         /// The task result contains the result
         /// </returns>
-        private static async Task<TResult> HandleCoreRequestAsync<TRequest, TResult>(PayPalCommerceSettings settings, TRequest request)
+        protected static async Task<TResult> HandleCoreRequestAsync<TRequest, TResult>(PayPalCommerceSettings settings, TRequest request)
             where TRequest : BraintreeHttp.HttpRequest where TResult : class
         {
             //prepare common request params
@@ -279,15 +277,17 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 if (!IsConfigured(settings))
                     throw new NopException("Plugin not configured");
 
+                var components = new List<string>() { "buttons" };
+
                 var parameters = new Dictionary<string, string>
                 {
                     ["client-id"] = settings.ClientId,
-                    ["currency"] = (await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId))?.CurrencyCode?.ToUpper(),
-                    ["intent"] = settings.PaymentType.ToString().ToLower(),
-                    ["commit"] = (settings.PaymentType == Domain.PaymentType.Capture).ToString().ToLower(),
-                    ["vault"] = false.ToString().ToLower(),
-                    ["debug"] = false.ToString().ToLower(),
-                    ["components"] = "buttons",
+                    ["currency"] = (await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId))?.CurrencyCode?.ToUpperInvariant(),
+                    ["intent"] = settings.PaymentType.ToString().ToLowerInvariant(),
+                    ["commit"] = (settings.PaymentType == Domain.PaymentType.Capture).ToString().ToLowerInvariant(),
+                    ["vault"] = false.ToString().ToLowerInvariant(),
+                    ["debug"] = false.ToString().ToLowerInvariant(),
+                    ["components"] = "",
                     //["buyer-country"] = null, //available in the sandbox only
                     //["locale"] = null, //PayPal auto detects this
                 };
@@ -296,7 +296,10 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 if (!string.IsNullOrEmpty(settings.EnabledFunding))
                     parameters["enable-funding"] = settings.EnabledFunding;
                 if (widgetZone.Equals(PublicWidgetZones.OrderSummaryContentBefore) || widgetZone.Equals(PublicWidgetZones.ProductDetailsTop))
-                    parameters["components"] = "buttons,funding-eligibility";
+                    components.Add("funding-eligibility");
+                if (settings.DisplayPayLaterMessages)
+                    components.Add("messages");
+                parameters["components"] = string.Join(",", components);
                 var scriptUrl = QueryHelpers.AddQueryString(PayPalCommerceDefaults.ServiceScriptUrl, parameters);
 
                 var pageType = widgetZone.Equals(PublicWidgetZones.OrderSummaryContentBefore)
@@ -338,24 +341,30 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 var billingAddress = await _addresService.GetAddressByIdAsync(customer.BillingAddressId ?? 0)
                     ?? throw new NopException("Customer billing address not set");
 
+                var shoppingCart = (await _shoppingCartService
+                    .GetShoppingCartAsync(customer, Core.Domain.Orders.ShoppingCartType.ShoppingCart, store.Id))
+                    .ToList();
+
                 var shippingAddress = await _addresService.GetAddressByIdAsync(customer.ShippingAddressId ?? 0);
+                if (!await _shoppingCartService.ShoppingCartRequiresShippingAsync(shoppingCart))
+                    shippingAddress = null;
 
                 var billStateProvince = await _stateProvinceService.GetStateProvinceByAddressAsync(billingAddress);
                 var shipStateProvince = await _stateProvinceService.GetStateProvinceByAddressAsync(shippingAddress);
 
                 //prepare order details
-                var orderDetails = new OrderRequest { CheckoutPaymentIntent = settings.PaymentType.ToString().ToUpper() };
+                var orderDetails = new OrderRequest { CheckoutPaymentIntent = settings.PaymentType.ToString().ToUpperInvariant() };
 
                 //prepare some common properties
                 orderDetails.ApplicationContext = new ApplicationContext
                 {
                     BrandName = CommonHelper.EnsureMaximumLength(store.Name, 127),
-                    LandingPage = LandingPageType.Billing.ToString().ToUpper(),
+                    LandingPage = LandingPageType.Billing.ToString().ToUpperInvariant(),
                     UserAction = settings.PaymentType == Domain.PaymentType.Authorize
-                        ? UserActionType.Continue.ToString().ToUpper()
-                        : UserActionType.Pay_now.ToString().ToUpper(),
+                        ? UserActionType.Continue.ToString().ToUpperInvariant()
+                        : UserActionType.Pay_now.ToString().ToUpperInvariant(),
                     ShippingPreference = (shippingAddress != null ? ShippingPreferenceType.Set_provided_address : ShippingPreferenceType.No_shipping)
-                        .ToString().ToUpper()
+                        .ToString().ToUpperInvariant()
                 };
 
                 //prepare customer billing details
@@ -384,11 +393,9 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 }
 
                 //prepare purchase unit details
-                var shoppingCart = (await _shoppingCartService
-                    .GetShoppingCartAsync(customer, Core.Domain.Orders.ShoppingCartType.ShoppingCart, store.Id))
-                    .ToList();
                 var taxTotal = Math.Round((await _orderTotalCalculationService.GetTaxTotalAsync(shoppingCart, false)).taxTotal, 2);
-                var shippingTotal = Math.Round(await _orderTotalCalculationService.GetShoppingCartShippingTotalAsync(shoppingCart) ?? decimal.Zero, 2);
+                var (cartShippingTotal, _, _) = await _orderTotalCalculationService.GetShoppingCartShippingTotalAsync(shoppingCart, false);
+                var shippingTotal = Math.Round(cartShippingTotal ?? decimal.Zero, 2);
                 var (shoppingCartTotal, _, _, _, _, _) = await _orderTotalCalculationService
                     .GetShoppingCartTotalAsync(shoppingCart, usePaymentMethodAdditionalFee: false);
                 var orderTotal = Math.Round(shoppingCartTotal ?? decimal.Zero, 2);
@@ -419,15 +426,19 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                     };
                 }
 
+                PayPalCheckoutSdk.Orders.Money prepareMoney(decimal value) => new()
+                {
+                    CurrencyCode = currency,
+                    Value = value.ToString(PayPalCommerceDefaults.CurrenciesWithoutDecimals.Contains(currency.ToUpperInvariant()) ? "0" : "0.00", CultureInfo.InvariantCulture)
+                };
+
                 //set order items
-                var itemTotal = decimal.Zero;
                 purchaseUnit.Items = await shoppingCart.SelectAwait(async item =>
                 {
                     var product = await _productService.GetProductByIdAsync(item.ProductId);
 
                     var (unitPrice, _, _) = await _shoppingCartService.GetUnitPriceAsync(item, true);
                     var (itemPrice, _) = await _taxService.GetProductPriceAsync(product, unitPrice, false, customer);
-                    itemTotal += itemPrice * item.Quantity;
                     return new Item
                     {
                         Name = CommonHelper.EnsureMaximumLength(product.Name, 127),
@@ -435,44 +446,52 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                         Sku = CommonHelper.EnsureMaximumLength(product.Sku, 127),
                         Quantity = item.Quantity.ToString(),
                         Category = (product.IsDownload ? ItemCategoryType.Digital_goods : ItemCategoryType.Physical_goods)
-                            .ToString().ToUpper(),
-                        UnitAmount = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = itemPrice.ToString("0.00", CultureInfo.InvariantCulture) }
+                            .ToString().ToUpperInvariant(),
+                        UnitAmount = prepareMoney(itemPrice)
                     };
                 }).ToListAsync();
 
                 //add checkout attributes as order items
                 var checkoutAttributes = await _genericAttributeService
                     .GetAttributeAsync<string>(customer, NopCustomerDefaults.CheckoutAttributes, store.Id);
-                var checkoutAttributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributes);
+                var checkoutAttributeValues = _checkoutAttributeParser.ParseAttributeValues(checkoutAttributes);
                 await foreach (var (attribute, values) in checkoutAttributeValues)
                 {
                     await foreach (var attributeValue in values)
                     {
                         var (attributePrice, _) = await _taxService.GetCheckoutAttributePriceAsync(attribute, attributeValue, false, customer);
-                        itemTotal += attributePrice;
                         purchaseUnit.Items.Add(new Item
                         {
                             Name = CommonHelper.EnsureMaximumLength(attribute.Name, 127),
                             Description = CommonHelper.EnsureMaximumLength($"{attribute.Name} - {attributeValue.Name}", 127),
                             Quantity = 1.ToString(),
-                            UnitAmount = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = attributePrice.ToString("0.00", CultureInfo.InvariantCulture) }
+                            UnitAmount = prepareMoney(attributePrice)
                         });
                     }
                 }
 
                 //set totals
-                itemTotal = Math.Round(itemTotal, 2);
+                //there may be a problem with a mismatch of amounts since ItemTotal should equal sum of (unit amount * quantity) across all items
+                //but PayPal forcibly rounds all amounts to two decimal, so the more items, the higher the chance of rounding errors
+                //we obviously cannot change the order total, so slightly adjust other totals to match all requirements
+                var itemTotal = Math.Round(purchaseUnit.Items.Sum(item =>
+                    decimal.Parse(item.UnitAmount.Value, NumberStyles.Any, CultureInfo.InvariantCulture) * int.Parse(item.Quantity)), 2);
                 var discountTotal = Math.Round(itemTotal + taxTotal + shippingTotal - orderTotal, 2);
+                if (discountTotal < decimal.Zero || discountTotal < settings.MinDiscountAmount)
+                {
+                    taxTotal -= discountTotal;
+                    discountTotal = decimal.Zero;
+                }
                 purchaseUnit.AmountWithBreakdown = new AmountWithBreakdown
                 {
                     CurrencyCode = currency,
-                    Value = orderTotal.ToString("0.00", CultureInfo.InvariantCulture),
+                    Value = prepareMoney(orderTotal).Value,
                     AmountBreakdown = new AmountBreakdown
                     {
-                        ItemTotal = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = itemTotal.ToString("0.00", CultureInfo.InvariantCulture) },
-                        TaxTotal = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = taxTotal.ToString("0.00", CultureInfo.InvariantCulture) },
-                        Shipping = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = shippingTotal.ToString("0.00", CultureInfo.InvariantCulture) },
-                        Discount = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = discountTotal.ToString("0.00", CultureInfo.InvariantCulture) }
+                        ItemTotal = prepareMoney(itemTotal),
+                        TaxTotal = prepareMoney(taxTotal),
+                        Shipping = prepareMoney(shippingTotal),
+                        Discount = prepareMoney(discountTotal)
                     }
                 };
 
@@ -570,9 +589,9 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 if (!IsConfigured(settings))
                     throw new NopException("Plugin not configured");
 
-                var request = new AuthorizationsVoidRequest(authorizationId);
+                var request = new VoidRequest(authorizationId);
 
-                return await HandleCheckoutRequestAsync<AuthorizationsVoidRequest, object>(settings, request);
+                return await HandleCheckoutRequestAsync<VoidRequest, PayPalCheckoutSdk.Payments.Authorization>(settings, request);
             });
         }
 
@@ -602,7 +621,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                     refundRequest.Amount = new PayPalCheckoutSdk.Payments.Money
                     {
                         CurrencyCode = currency,
-                        Value = amount.Value.ToString("0.00", CultureInfo.InvariantCulture)
+                        Value = amount.Value.ToString(PayPalCommerceDefaults.CurrenciesWithoutDecimals.Contains(currency.ToUpperInvariant()) ? "0" : "0.00", CultureInfo.InvariantCulture)
                     };
                 }
                 var request = new CapturesRefundRequest(captureId).RequestBody(refundRequest);
@@ -771,8 +790,14 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 if (!Guid.TryParse(orderReference, out var orderGuid))
                     throw new NopException($"Could not recognize an order reference '{orderReference}'");
 
-                var order = await _orderService.GetOrderByGuidAsync(orderGuid)
-                    ?? throw new NopException($"Could not find an order {orderGuid}");
+                var order = await _orderService.GetOrderByGuidAsync(orderGuid);
+                if (order is null)
+                {
+                    if (webhookResource is Order)
+                        return true; //the order may not have been created yet, no need to throw an exception in this case
+
+                    throw new NopException($"Could not find an order {orderGuid}");
+                }
 
                 await _orderService.InsertOrderNoteAsync(new Core.Domain.Orders.OrderNote()
                 {
@@ -877,15 +902,26 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 payPalOrder = webhookResource as Order;
                 switch (payPalOrder?.Status?.ToLowerInvariant())
                 {
-                    case "approved":
-                        if (decimal.TryParse(payPalOrder.PurchaseUnits?.FirstOrDefault()?.AmountWithBreakdown?.Value, out var approvedAmount) && approvedAmount == Math.Round(order.OrderTotal, 2))
+                    case "completed":
+                        if (decimal.TryParse(payPalOrder.PurchaseUnits?.FirstOrDefault()?.AmountWithBreakdown?.Value, out var approvedAmount) &&
+                            approvedAmount == Math.Round(order.OrderTotal, 2))
                         {
-                            //all is ok, so authorize the approved order
-                            if (_orderProcessingService.CanMarkOrderAsAuthorized(order))
+                            //all is ok, so authorize/capture the approved order
+                            if (string.Equals(payPalOrder.CheckoutPaymentIntent, "authorize", StringComparison.InvariantCultureIgnoreCase))
                             {
-                                order.AuthorizationTransactionResult = payPalOrder.Status;
-                                await _orderService.UpdateOrderAsync(order);
-                                await _orderProcessingService.MarkAsAuthorizedAsync(order);
+                                if (_orderProcessingService.CanMarkOrderAsAuthorized(order))
+                                {
+                                    order.AuthorizationTransactionResult = payPalOrder.Status;
+                                    await _orderProcessingService.MarkAsAuthorizedAsync(order);
+                                }
+                            }
+                            if (string.Equals(payPalOrder.CheckoutPaymentIntent, "capture", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                if (_orderProcessingService.CanMarkOrderAsPaid(order))
+                                {
+                                    order.CaptureTransactionResult = payPalOrder.Status;
+                                    await _orderProcessingService.MarkOrderAsPaidAsync(order);
+                                }
                             }
                         }
                         break;

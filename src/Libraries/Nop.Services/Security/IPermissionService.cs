@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Nop.Core.Domain.Customers;
+﻿using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Security;
 
 namespace Nop.Services.Security
@@ -56,6 +54,13 @@ namespace Nop.Services.Security
         /// <param name="permissionProvider">Permission provider</param>
         /// <returns>A task that represents the asynchronous operation</returns>
         Task InstallPermissionsAsync(IPermissionProvider permissionProvider);
+
+        /// <summary>
+        /// Install permissions
+        /// </summary>
+        /// <param name="permissionProvider">Permission provider</param>
+        /// <returns>A task that represents the asynchronous operation</returns>
+        Task UninstallPermissionsAsync(IPermissionProvider permissionProvider);
 
         /// <summary>
         /// Authorize permission

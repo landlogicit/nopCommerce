@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
-using System.Linq;
 using System.Reflection;
 using FluentMigrator.Builders.Alter.Table;
 using FluentMigrator.Builders.Create;
 using FluentMigrator.Builders.Create.Table;
+using FluentMigrator.Infrastructure.Extensions;
 using FluentMigrator.Model;
+using LinqToDB.Mapping;
 using Nop.Core;
 using Nop.Core.Infrastructure;
 using Nop.Data.Mapping;
@@ -21,6 +21,8 @@ namespace Nop.Data.Extensions
     {
         #region  Utils
 
+        private const int DATE_TIME_PRECISION = 6;
+
         private static Dictionary<Type, Action<ICreateTableColumnAsTypeSyntax>> TypeMapping { get; } = new Dictionary<Type, Action<ICreateTableColumnAsTypeSyntax>>
         {
             [typeof(int)] = c => c.AsInt32(),
@@ -28,7 +30,7 @@ namespace Nop.Data.Extensions
             [typeof(string)] = c => c.AsString(int.MaxValue).Nullable(),
             [typeof(bool)] = c => c.AsBoolean(),
             [typeof(decimal)] = c => c.AsDecimal(18, 4),
-            [typeof(DateTime)] = c => c.AsDateTime2(),
+            [typeof(DateTime)] = c => c.AsNopDateTime2(),
             [typeof(byte[])] = c => c.AsBinary(int.MaxValue),
             [typeof(Guid)] = c => c.AsGuid()
         };
@@ -45,11 +47,29 @@ namespace Nop.Data.Extensions
 
             TypeMapping[propType](column);
 
+            if (propType == typeof(DateTime))
+                create.CurrentColumn.Precision = DATE_TIME_PRECISION;
+
             if (canBeNullable)
                 create.Nullable();
         }
 
         #endregion
+
+        /// <summary>
+        /// Defines the column type as date that is combined with a time of day and a specified precision
+        /// </summary>
+        public static ICreateTableColumnOptionOrWithColumnSyntax AsNopDateTime2(this ICreateTableColumnAsTypeSyntax syntax)
+        {
+            var dataSettings = DataSettingsManager.LoadSettings();
+
+            return dataSettings.DataProvider switch
+            {
+                DataProviderType.MySql => syntax.AsCustom($"datetime({DATE_TIME_PRECISION})"),
+                DataProviderType.SqlServer => syntax.AsCustom($"datetime2({DATE_TIME_PRECISION})"),
+                _ => syntax.AsDateTime2()
+            };
+        }
 
         /// <summary>
         /// Specifies a foreign key
@@ -110,12 +130,12 @@ namespace Nop.Data.Extensions
         /// <param name="type">Type of entity</param>
         public static void RetrieveTableExpressions(this CreateTableExpressionBuilder builder, Type type)
         {
-            var tp = Singleton<ITypeFinder>.Instance
+            var typeFinder = Singleton<ITypeFinder>.Instance
                 .FindClassesOfType(typeof(IEntityBuilder))
                 .FirstOrDefault(t => t.BaseType?.GetGenericArguments().Contains(type) ?? false);
 
-            if (tp != null)
-                (EngineContext.Current.ResolveUnregistered(tp) as IEntityBuilder)?.MapEntity(builder);
+            if (typeFinder != null)
+                (EngineContext.Current.ResolveUnregistered(typeFinder) as IEntityBuilder)?.MapEntity(builder);
 
             var expression = builder.Expression;
             if (!expression.Columns.Any(c => c.IsPrimaryKey))
@@ -136,6 +156,8 @@ namespace Nop.Data.Extensions
             var propertiesToAutoMap = type
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty)
                 .Where(pi => pi.DeclaringType != typeof(BaseEntity) &&
+                pi.CanWrite &&
+                !pi.HasAttribute<NotMappedAttribute>() && !pi.HasAttribute<NotColumnAttribute>() &&
                 !expression.Columns.Any(x => x.Name.Equals(NameCompatibilityManager.GetColumnName(type, pi.Name), StringComparison.OrdinalIgnoreCase)) &&
                 TypeMapping.ContainsKey(GetTypeToMap(pi.PropertyType).propType));
 
