@@ -150,6 +150,9 @@ namespace Nop.Web.Framework.Migrations.UpgradeTo470
                 ["Admin.Configuration.Settings.Tax.AutomaticallyDetectCountry"] = "Automatically detect country by IP address",
                 ["Admin.Configuration.Settings.Tax.AutomaticallyDetectCountry.Hint"] = "When this setting is enabled, if the customer's billing/shipping address is not already set, the country of address used for tax calculation will be determined automatically by the GEO service (by IP address).",
 
+                //433
+                ["Admin.Catalog.Products.ProductAttributes.Attributes.Values.Fields.AssociatedProduct.Downloadable"] = "The associated product is downloadable, keep in mind that customers won't be able to download it.",
+
             }, languageId);
 
             #endregion
