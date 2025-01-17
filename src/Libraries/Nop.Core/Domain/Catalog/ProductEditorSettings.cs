@@ -226,12 +226,7 @@ public partial class ProductEditorSettings : ISettings
     /// Gets or sets a value indicating whether 'Allow only existing attribute combinations' field is shown
     /// </summary>
     public bool AllowAddingOnlyExistingAttributeCombinations { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether to display attribute combination images only
-    /// </summary>
-    public bool DisplayAttributeCombinationImagesOnly { get; set; }
-
+    
     /// <summary>
     /// Gets or sets a value indicating whether 'Not returnable' field is shown
     /// </summary>
@@ -306,4 +301,9 @@ public partial class ProductEditorSettings : ISettings
     /// Gets or sets a value indicating whether 'Stock quantity history' tab is shown
     /// </summary>
     public bool StockQuantityHistory { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether 'Age verification' field is shown
+    /// </summary>
+    public bool AgeVerification { get; set; }
 }

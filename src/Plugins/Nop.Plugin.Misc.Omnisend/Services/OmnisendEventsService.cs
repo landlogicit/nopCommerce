@@ -37,6 +37,7 @@ public class OmnisendEventsService
     private readonly ICountryService _countryService;
     private readonly ICustomerService _customerService;
     private readonly IDiscountService _discountService;
+    private readonly IGenericAttributeService _genericAttributeService;
     private readonly ILocalizationService _localizationService;
     private readonly IManufacturerService _manufacturerService;
     private readonly IMeasureService _measureService;
@@ -68,6 +69,7 @@ public class OmnisendEventsService
         ICountryService countryService,
         ICustomerService customerService,
         IDiscountService discountService,
+        IGenericAttributeService genericAttributeService,
         ILocalizationService localizationService,
         IManufacturerService manufacturerService,
         IMeasureService measureService,
@@ -95,6 +97,7 @@ public class OmnisendEventsService
         _countryService = countryService;
         _customerService = customerService;
         _discountService = discountService;
+        _genericAttributeService = genericAttributeService;
         _localizationService = localizationService;
         _manufacturerService = manufacturerService;
         _measureService = measureService;
@@ -392,14 +395,19 @@ public class OmnisendEventsService
             ? await _measureService.ConvertFromPrimaryMeasureWeightAsync(orderItem.ItemWeight ?? 0, measureWeight)
             : 0;
 
+        float discount = 0;
+
+        if (orderItem.DiscountAmountInclTax > 0 && orderItem.Quantity > 0)
+            discount = (float)orderItem.DiscountAmountInclTax / orderItem.Quantity;
+
         var productItem = new OrderProductItem
         {
             ProductCategories = await GetProductCategoriesAsync(product),
             ProductDescription = product.ShortDescription,
-            ProductDiscount = (float)orderItem.DiscountAmountInclTax,
+            ProductDiscount = discount,
             ProductId = product.Id,
             ProductImageURL = pictureUrl,
-            ProductPrice = (float)orderItem.PriceInclTax,
+            ProductPrice = (float)orderItem.UnitPriceInclTax + discount,
             ProductQuantity = orderItem.Quantity,
             ProductSku = sku,
             ProductStrikeThroughPrice = (float)product.OldPrice,
@@ -518,11 +526,35 @@ public class OmnisendEventsService
         if (eventMessage.PreviousOrderStatus == order.OrderStatus)
             return;
 
-        if (order.OrderStatus == OrderStatus.Cancelled)
-            await SendEventAsync(await CreateOrderCanceledEventAsync(eventMessage.Order));
+        switch (order.OrderStatus)
+        {
+            case OrderStatus.Cancelled:
+            {
+                var sent = await _genericAttributeService.GetAttributeAsync<bool>(order, OmnisendDefaults.OrderCanceledAttribute);
 
-        if (order.OrderStatus == OrderStatus.Complete)
-            await SendEventAsync(await CreateOrderFulfilledEventAsync(eventMessage.Order));
+                if (sent)
+                    return;
+
+                await SendEventAsync(await CreateOrderCanceledEventAsync(order));
+
+                await _genericAttributeService.SaveAttributeAsync(order, OmnisendDefaults.OrderCanceledAttribute, true);
+
+                break;
+            }
+            case OrderStatus.Complete:
+            {
+                var sent = await _genericAttributeService.GetAttributeAsync<bool>(order, OmnisendDefaults.OrderFulfilledAttribute);
+
+                if (sent)
+                    return;
+
+                await SendEventAsync(await CreateOrderFulfilledEventAsync(order));
+
+                await _genericAttributeService.SaveAttributeAsync(order, OmnisendDefaults.OrderFulfilledAttribute, true);
+
+                break;
+            }
+        }
     }
 
     /// <summary>
