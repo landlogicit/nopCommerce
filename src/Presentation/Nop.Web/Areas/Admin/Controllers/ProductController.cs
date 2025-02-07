@@ -55,7 +55,6 @@ public partial class ProductController : BaseAdminController
     protected readonly IDiscountService _discountService;
     protected readonly IDownloadService _downloadService;
     protected readonly IExportManager _exportManager;
-    protected readonly IGenericAttributeService _genericAttributeService;
     protected readonly IHttpClientFactory _httpClientFactory;
     protected readonly IImportManager _importManager;
     protected readonly ILanguageService _languageService;
@@ -103,7 +102,6 @@ public partial class ProductController : BaseAdminController
         IDiscountService discountService,
         IDownloadService downloadService,
         IExportManager exportManager,
-        IGenericAttributeService genericAttributeService,
         IHttpClientFactory httpClientFactory,
         IImportManager importManager,
         ILanguageService languageService,
@@ -146,7 +144,6 @@ public partial class ProductController : BaseAdminController
         _discountService = discountService;
         _downloadService = downloadService;
         _exportManager = exportManager;
-        _genericAttributeService = genericAttributeService;
         _httpClientFactory = httpClientFactory;
         _importManager = importManager;
         _languageService = languageService;
@@ -262,7 +259,7 @@ public partial class ProductController : BaseAdminController
         foreach (var pp in await _productService.GetProductPicturesByProductIdAsync(product.Id))
             await _pictureService.SetSeoFilenameAsync(pp.PictureId, await _pictureService.GetPictureSeNameAsync(product.Name));
     }
-    
+
     protected virtual async Task SaveCategoryMappingsAsync(Product product, ProductModel model)
     {
         var existingProductCategories = await _categoryService.GetProductCategoriesByProductIdAsync(product.Id, true);
@@ -839,7 +836,7 @@ public partial class ProductController : BaseAdminController
 
         var products = await _productService.GetProductsByIdsAsync(productIds);
 
-        foreach (var product in products) 
+        foreach (var product in products)
             rez[product.Id].Product = product;
 
         return rez.Values.ToList();
@@ -903,7 +900,7 @@ public partial class ProductController : BaseAdminController
         var data = await ParseBulkEditDataAsync();
 
         var productsToUpdate = data.Where(d => d.NeedToUpdate(selected)).ToList();
-        await _productService.UpdateProductsAsync(productsToUpdate.Select(d=>d.UpdateProduct(selected)).ToList());
+        await _productService.UpdateProductsAsync(productsToUpdate.Select(d => d.UpdateProduct(selected)).ToList());
 
         var productsToInsert = data.Where(d => d.NeedToCreate(selected)).ToList();
         await _productService.InsertProductsAsync(productsToInsert.Select(d => d.CreateProduct(selected)).ToList());
@@ -972,7 +969,7 @@ public partial class ProductController : BaseAdminController
     }
 
     [CheckPermission(StandardPermission.Catalog.PRODUCTS_CREATE_EDIT_DELETE)]
-    public virtual async Task<IActionResult> Create(bool showtour = false)
+    public virtual async Task<IActionResult> Create()
     {
         //validate maximum number of products per vendor
         var currentVendor = await _workContext.GetCurrentVendorAsync();
@@ -987,17 +984,6 @@ public partial class ProductController : BaseAdminController
 
         //prepare model
         var model = await _productModelFactory.PrepareProductModelAsync(new ProductModel(), null);
-
-        //show configuration tour
-        if (showtour)
-        {
-            var customer = await _workContext.GetCurrentCustomerAsync();
-            var hideCard = await _genericAttributeService.GetAttributeAsync<bool>(customer, NopCustomerDefaults.HideConfigurationStepsAttribute);
-            var closeCard = await _genericAttributeService.GetAttributeAsync<bool>(customer, NopCustomerDefaults.CloseConfigurationStepsAttribute);
-
-            if (!hideCard && !closeCard)
-                ViewBag.ShowTour = true;
-        }
 
         return View(model);
     }
@@ -1045,7 +1031,7 @@ public partial class ProductController : BaseAdminController
 
             //manufacturers
             await SaveManufacturerMappingsAsync(product, model);
-            
+
             //stores
             await _productService.UpdateProductStoreMappingsAsync(product, model.SelectedStoreIds);
 
@@ -1181,7 +1167,7 @@ public partial class ProductController : BaseAdminController
 
             //manufacturers
             await SaveManufacturerMappingsAsync(product, model);
-            
+
             //stores
             await _productService.UpdateProductStoreMappingsAsync(product, model.SelectedStoreIds);
 
@@ -1309,14 +1295,14 @@ public partial class ProductController : BaseAdminController
             .Where(p => currentVendor == null || p.VendorId == currentVendor.Id).ToList();
 
         await _productService.DeleteProductsAsync(products);
-        
+
         //activity log
         var activityLogFormat = await _localizationService.GetResourceAsync("ActivityLog.DeleteProduct");
-        
+
         foreach (var product in products)
             await _customerActivityService.InsertActivityAsync("DeleteProduct",
                 string.Format(activityLogFormat, product.Name), product);
-        
+
         return Json(new { Result = true });
     }
 
@@ -1395,7 +1381,7 @@ public partial class ProductController : BaseAdminController
     public virtual async Task<IActionResult> LoadProductFriendlyNames(string productIds)
     {
         var result = string.Empty;
-        
+
         if (string.IsNullOrWhiteSpace(productIds))
             return Json(new { Text = result });
 
