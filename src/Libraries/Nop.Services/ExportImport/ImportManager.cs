@@ -64,6 +64,7 @@ public partial class ImportManager : IImportManager
     protected readonly IManufacturerService _manufacturerService;
     protected readonly IMeasureService _measureService;
     protected readonly INewsLetterSubscriptionService _newsLetterSubscriptionService;
+    protected readonly INewsLetterSubscriptionTypeService _newsLetterSubscriptionTypeService;
     protected readonly INopFileProvider _fileProvider;
     protected readonly IOrderService _orderService;
     protected readonly IPictureService _pictureService;
@@ -72,7 +73,6 @@ public partial class ImportManager : IImportManager
     protected readonly IProductTagService _productTagService;
     protected readonly IProductTemplateService _productTemplateService;
     protected readonly IServiceScopeFactory _serviceScopeFactory;
-    protected readonly IShippingService _shippingService;
     protected readonly ISpecificationAttributeService _specificationAttributeService;
     protected readonly IStateProvinceService _stateProvinceService;
     protected readonly IStoreContext _storeContext;
@@ -81,6 +81,7 @@ public partial class ImportManager : IImportManager
     protected readonly ITaxCategoryService _taxCategoryService;
     protected readonly IUrlRecordService _urlRecordService;
     protected readonly IVendorService _vendorService;
+    protected readonly IWarehouseService _warehouseService;
     protected readonly IWorkContext _workContext;
     protected readonly MediaSettings _mediaSettings;
     protected readonly SecuritySettings _securitySettings;
@@ -111,6 +112,7 @@ public partial class ImportManager : IImportManager
         IManufacturerService manufacturerService,
         IMeasureService measureService,
         INewsLetterSubscriptionService newsLetterSubscriptionService,
+        INewsLetterSubscriptionTypeService newsLetterSubscriptionTypeService,
         INopFileProvider fileProvider,
         IOrderService orderService,
         IPictureService pictureService,
@@ -119,7 +121,6 @@ public partial class ImportManager : IImportManager
         IProductTagService productTagService,
         IProductTemplateService productTemplateService,
         IServiceScopeFactory serviceScopeFactory,
-        IShippingService shippingService,
         ISpecificationAttributeService specificationAttributeService,
         IStateProvinceService stateProvinceService,
         IStoreContext storeContext,
@@ -128,6 +129,7 @@ public partial class ImportManager : IImportManager
         ITaxCategoryService taxCategoryService,
         IUrlRecordService urlRecordService,
         IVendorService vendorService,
+        IWarehouseService warehouseService,
         IWorkContext workContext,
         MediaSettings mediaSettings,
         SecuritySettings securitySettings,
@@ -154,6 +156,7 @@ public partial class ImportManager : IImportManager
         _manufacturerService = manufacturerService;
         _measureService = measureService;
         _newsLetterSubscriptionService = newsLetterSubscriptionService;
+        _newsLetterSubscriptionTypeService = newsLetterSubscriptionTypeService;
         _orderService = orderService;
         _pictureService = pictureService;
         _productAttributeService = productAttributeService;
@@ -161,7 +164,6 @@ public partial class ImportManager : IImportManager
         _productTagService = productTagService;
         _productTemplateService = productTemplateService;
         _serviceScopeFactory = serviceScopeFactory;
-        _shippingService = shippingService;
         _specificationAttributeService = specificationAttributeService;
         _stateProvinceService = stateProvinceService;
         _storeContext = storeContext;
@@ -170,6 +172,7 @@ public partial class ImportManager : IImportManager
         _taxCategoryService = taxCategoryService;
         _urlRecordService = urlRecordService;
         _vendorService = vendorService;
+        _warehouseService = warehouseService;
         _workContext = workContext;
         _mediaSettings = mediaSettings;
         _securitySettings = securitySettings;
@@ -462,7 +465,7 @@ public partial class ImportManager : IImportManager
     }
 
     /// <returns>A task that represents the asynchronous operation</returns>
-    protected virtual async Task<(string seName, bool isParentCategoryExists)> UpdateCategoryByXlsxAsync(Category category, PropertyManager<Category> manager, Dictionary<string, ValueTask<Category>> allCategories, bool isNew)
+    protected virtual async Task<(string seName, bool isParentCategoryExists)> UpdateCategoryByXlsxAsync(Category category, PropertyManager<Category> manager, Dictionary<string, ValueTask<Category>> allCategories, IList<Store> allStores, bool isNew)
     {
         var seName = string.Empty;
         var isParentCategoryExists = true;
@@ -556,8 +559,8 @@ public partial class ImportManager : IImportManager
                 case "AutomaticallyCalculatePriceRange":
                     category.ManuallyPriceRange = property.BooleanValue;
                     break;
-                case "IncludeInTopMenu":
-                    category.IncludeInTopMenu = property.BooleanValue;
+                case "IsLimitedToStores":
+                    category.LimitedToStores = property.BooleanValue;
                     break;
                 case "Published":
                     category.Published = property.BooleanValue;
@@ -569,6 +572,17 @@ public partial class ImportManager : IImportManager
                     seName = property.StringValue;
                     break;
             }
+        }
+
+        var tempProperty = manager.GetDefaultProperty("LimitedToStores");
+        if (tempProperty != null)
+        {
+            var limitedToStoresList = tempProperty.StringValue;
+
+            var importedStores = category.LimitedToStores ? limitedToStoresList.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => allStores.FirstOrDefault(store => store.Name == x.Trim())?.Id ?? int.Parse(x.Trim())).ToList() : new List<int>();
+
+            await _storeMappingService.SaveStoreMappingsAsync(category, importedStores);
         }
 
         category.UpdatedOnUtc = DateTime.UtcNow;
@@ -609,7 +623,6 @@ public partial class ImportManager : IImportManager
             category.PageSize = _catalogSettings.DefaultCategoryPageSize;
             category.PageSizeOptions = _catalogSettings.DefaultCategoryPageSizeOptions;
             category.Published = true;
-            category.IncludeInTopMenu = true;
             category.AllowCustomersToSelectPageSize = true;
         }
         else
@@ -831,13 +844,13 @@ public partial class ImportManager : IImportManager
             var productPictureIds = (await _pictureService.GetPicturesByProductIdAsync(product.Id))
                 .Select(p => p.Id).ToList();
 
-            //delete manufacturers
-            foreach (var existingValuePicture in existingValuePictures)
-                if (pictureIds.Contains(existingValuePicture.PictureId) ||
-                    !productPictureIds.Contains(existingValuePicture.PictureId))
-                    await _productAttributeService.DeleteProductAttributeValuePictureAsync(existingValuePicture);
+            //delete attribute value pictures
+            var picturesToDelete = existingValuePictures
+                .Where(p => pictureIds.Contains(p.PictureId) || !productPictureIds.Contains(p.PictureId))
+                .ToList();
+            await _productAttributeService.DeleteProductAttributeValuePicturesAsync(picturesToDelete);
 
-            //add manufacturers
+            //add attribute value pictures
             foreach (var pictureId in pictureIds)
             {
                 if (!productPictureIds.Contains(pictureId))
@@ -1229,7 +1242,7 @@ public partial class ImportManager : IImportManager
 
             specificationAttributeManager.SetSelectList("AttributeType", await SpecificationAttributeType.Option.ToSelectListAsync(useLocalization: false));
             specificationAttributeManager.SetSelectList("SpecificationAttribute", (await _specificationAttributeService
-                    .GetSpecificationAttributesAsync())
+                    .GetAllSpecificationAttributesAsync())
                 .Select(sa => sa as BaseEntity)
                 .ToSelectList(p => (p as SpecificationAttribute)?.Name ?? string.Empty));
 
@@ -1461,7 +1474,7 @@ public partial class ImportManager : IImportManager
 
             var startRow = metadata.ProductsInFile[(fileIndex - 1) * _catalogSettings.ExportImportProductsCountInOneFile];
 
-            var endRow = metadata.CountProductsInFile > curIndex + 1
+            var endRow = metadata.CountProductsInFile > curIndex
                 ? metadata.ProductsInFile[curIndex - 1]
                 : metadata.EndRow;
 
@@ -2468,7 +2481,7 @@ public partial class ImportManager : IImportManager
                 var oldWarehouseMessage = string.Empty;
                 if (previousWarehouseId > 0)
                 {
-                    var oldWarehouse = await _shippingService.GetWarehouseByIdAsync(previousWarehouseId);
+                    var oldWarehouse = await _warehouseService.GetWarehouseByIdAsync(previousWarehouseId);
                     if (oldWarehouse != null)
                         oldWarehouseMessage = string.Format(await _localizationService.GetResourceAsync("Admin.StockQuantityHistory.Messages.EditWarehouse.Old"), oldWarehouse.Name);
                 }
@@ -2476,7 +2489,7 @@ public partial class ImportManager : IImportManager
                 var newWarehouseMessage = string.Empty;
                 if (product.WarehouseId > 0)
                 {
-                    var newWarehouse = await _shippingService.GetWarehouseByIdAsync(product.WarehouseId);
+                    var newWarehouse = await _warehouseService.GetWarehouseByIdAsync(product.WarehouseId);
                     if (newWarehouse != null)
                         newWarehouseMessage = string.Format(await _localizationService.GetResourceAsync("Admin.StockQuantityHistory.Messages.EditWarehouse.New"), newWarehouse.Name);
                 }
@@ -2561,8 +2574,7 @@ public partial class ImportManager : IImportManager
                 var deletedProductCategories = await categories.Where(categoryId => !importedCategories.Contains(categoryId))
                     .SelectAwait(async categoryId => (await _categoryService.GetProductCategoriesByProductIdAsync(product.Id, true)).FirstOrDefault(pc => pc.CategoryId == categoryId)).Where(pc => pc != null).ToListAsync();
 
-                foreach (var deletedProductCategory in deletedProductCategories)
-                    await _categoryService.DeleteProductCategoryAsync(deletedProductCategory);
+                await _categoryService.DeleteProductCategoriesAsync(deletedProductCategories);
             }
 
             tempProperty = metadata.Manager.GetDefaultProperty("Manufacturers");
@@ -2610,8 +2622,9 @@ public partial class ImportManager : IImportManager
                 //delete product manufacturers
                 var deletedProductsManufacturers = await manufacturers.Where(manufacturerId => !importedManufacturers.Contains(manufacturerId))
                     .SelectAwait(async manufacturerId => (await _manufacturerService.GetProductManufacturersByProductIdAsync(product.Id)).FirstOrDefault(pc => pc.ManufacturerId == manufacturerId)).ToListAsync();
-                foreach (var deletedProductManufacturer in deletedProductsManufacturers.Where(m => m != null))
-                    await _manufacturerService.DeleteProductManufacturerAsync(deletedProductManufacturer);
+
+                deletedProductsManufacturers = deletedProductsManufacturers.Where(m => m != null).ToList();
+                await _manufacturerService.DeleteProductManufacturersAsync(deletedProductsManufacturers);
             }
 
             tempProperty = metadata.Manager.GetDefaultProperty("ProductTags");
@@ -2639,7 +2652,7 @@ public partial class ImportManager : IImportManager
                 var importedStores = product.LimitedToStores ? limitedToStoresList.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(x => allStores.FirstOrDefault(store => store.Name == x.Trim())?.Id ?? int.Parse(x.Trim())).ToList() : new List<int>();
 
-                await _productService.UpdateProductStoreMappingsAsync(product, importedStores);
+                await _storeMappingService.SaveStoreMappingsAsync(product, importedStores);
             }
 
             var pictureMetaData = new ProductPictureMetadata
@@ -2693,57 +2706,74 @@ public partial class ImportManager : IImportManager
     /// A task that represents the asynchronous operation
     /// The task result contains the number of imported subscribers
     /// </returns>
-    public virtual async Task<int> ImportNewsletterSubscribersFromTxtAsync(Stream stream)
+    public virtual async Task<int> ImportNewsLetterSubscribersFromTxtAsync(Stream stream)
     {
+        var store = await _storeContext.GetCurrentStoreAsync();
+        var defaultLanguageId = store.DefaultLanguageId > 0 ? store.DefaultLanguageId : (await _workContext.GetWorkingLanguageAsync()).Id;
+        var defaultTypeId = ((await _newsLetterSubscriptionTypeService.GetAllNewsLetterSubscriptionTypesAsync(store.Id)).FirstOrDefault()
+            ?? (await _newsLetterSubscriptionTypeService.GetAllNewsLetterSubscriptionTypesAsync()).FirstOrDefault())
+            .Id;
+        var allSubscriptions = (await _newsLetterSubscriptionService.GetAllNewsLetterSubscriptionsAsync()).ToList();
+
         var count = 0;
         using (var reader = new StreamReader(stream))
+        {
             while (!reader.EndOfStream)
             {
                 var line = await reader.ReadLineAsync();
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
+
                 var tmp = line.Split(',');
-
-                if (tmp.Length > 3)
+                if (tmp.Length > 5)
                     throw new NopException("Wrong file format");
-
-                var isActive = true;
-
-                var store = await _storeContext.GetCurrentStoreAsync();
-                var storeId = store.Id;
 
                 //"email" field specified
                 var email = tmp[0].Trim();
-
                 if (!CommonHelper.IsValidEmail(email))
                     continue;
 
                 //"active" field specified
-                if (tmp.Length >= 2)
-                    isActive = bool.Parse(tmp[1].Trim());
+                var isActive = true;
+                if (tmp.Length >= 2 && !bool.TryParse(tmp[1].Trim(), out isActive))
+                    continue;
+
+                //"typeId" field specified
+                var typeId = defaultTypeId;
+                if (tmp.Length >= 3 && !int.TryParse(tmp[2].Trim(), out typeId))
+                    continue;
 
                 //"storeId" field specified
-                if (tmp.Length == 3)
-                    storeId = int.Parse(tmp[2].Trim());
+                var storeId = store.Id;
+                if (tmp.Length >= 4 && !int.TryParse(tmp[3].Trim(), out storeId))
+                    continue;
+
+                //"languageId" field specified
+                var languageId = 0;
+                if (tmp.Length == 5)
+                    _ = int.TryParse(tmp[4].Trim(), out languageId);
 
                 //import
-                var subscription = await _newsLetterSubscriptionService.GetNewsLetterSubscriptionByEmailAndStoreIdAsync(email, storeId);
+                var subscription = allSubscriptions.FirstOrDefault(subscription =>
+                    string.Equals(subscription.Email, email, StringComparison.InvariantCultureIgnoreCase) &&
+                    subscription.StoreId == storeId &&
+                    subscription.TypeId == typeId);
                 if (subscription != null)
                 {
-                    subscription.Email = email;
                     subscription.Active = isActive;
+                    subscription.LanguageId = languageId > 0 ? languageId : defaultLanguageId;
                     await _newsLetterSubscriptionService.UpdateNewsLetterSubscriptionAsync(subscription);
                 }
                 else
                 {
-                    var customer = await _customerService.GetCustomerByEmailAsync(email);
                     subscription = new NewsLetterSubscription
                     {
                         Active = isActive,
                         CreatedOnUtc = DateTime.UtcNow,
                         Email = email,
                         StoreId = storeId,
-                        LanguageId = customer?.LanguageId ?? store.DefaultLanguageId,
+                        LanguageId = languageId > 0 ? languageId : defaultLanguageId,
+                        TypeId = typeId,
                         NewsLetterSubscriptionGuid = Guid.NewGuid()
                     };
                     await _newsLetterSubscriptionService.InsertNewsLetterSubscriptionAsync(subscription);
@@ -2751,6 +2781,7 @@ public partial class ImportManager : IImportManager
 
                 count++;
             }
+        }
 
         await _customerActivityService.InsertActivityAsync("ImportNewsLetterSubscriptions",
             string.Format(await _localizationService.GetResourceAsync("ActivityLog.ImportNewsLetterSubscriptions"), count));
@@ -3000,6 +3031,9 @@ public partial class ImportManager : IImportManager
 
         var saveNextTime = new List<int>();
 
+        //performance optimization, load all stores in one SQL request
+        var allStores = await _storeService.GetAllStoresAsync();
+
         while (true)
         {
             var allColumnsAreEmpty = manager.GetDefaultProperties
@@ -3013,7 +3047,7 @@ public partial class ImportManager : IImportManager
             var (category, isNew, currentCategoryBreadCrumb) = await GetCategoryFromXlsxAsync(manager, defaultWorksheet, iRow, allCategories);
 
             //update category by data in xlsx file
-            var (seName, isParentCategoryExists) = await UpdateCategoryByXlsxAsync(category, manager, allCategories, isNew);
+            var (seName, isParentCategoryExists) = await UpdateCategoryByXlsxAsync(category, manager, allCategories, allStores, isNew);
 
             if (isParentCategoryExists)
             {
@@ -3044,7 +3078,7 @@ public partial class ImportManager : IImportManager
                 //get category by data in xlsx file if it possible, or create new category
                 var (category, isNew, currentCategoryBreadCrumb) = await GetCategoryFromXlsxAsync(manager, defaultWorksheet, rowId, allCategories);
                 //update category by data in xlsx file
-                var (seName, isParentCategoryExists) = await UpdateCategoryByXlsxAsync(category, manager, allCategories, isNew);
+                var (seName, isParentCategoryExists) = await UpdateCategoryByXlsxAsync(category, manager, allCategories, allStores, isNew);
 
                 if (!isParentCategoryExists)
                     continue;

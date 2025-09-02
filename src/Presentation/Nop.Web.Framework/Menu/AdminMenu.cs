@@ -326,6 +326,14 @@ public partial class AdminMenu : IAdminMenu
                         },
                         new()
                         {
+                            SystemName = "Newsletter subscription types",
+                            Title = await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscriptionType"),
+                            PermissionNames = new List<string> { StandardPermission.Promotions.SUBSCRIPTION_TYPE_VIEW },
+                            Url = GetMenuItemUrl("NewsLetterSubscriptionType", "List"),
+                            IconClass = "far fa-dot-circle"
+                        },
+                        new()
+                        {
                             SystemName = "Campaigns",
                             Title = await _localizationService.GetResourceAsync("Admin.Promotions.Campaigns"),
                             PermissionNames = new List<string> { StandardPermission.Promotions.CAMPAIGNS_VIEW },
@@ -348,6 +356,14 @@ public partial class AdminMenu : IAdminMenu
                             Title = await _localizationService.GetResourceAsync("Admin.ContentManagement.Topics"),
                             PermissionNames = new List<string> { StandardPermission.ContentManagement.TOPICS_VIEW },
                             Url = GetMenuItemUrl("Topic", "List"),
+                            IconClass = "far fa-dot-circle"
+                        },
+                        new()
+                        {
+                            SystemName = "Menus",
+                            Title = await _localizationService.GetResourceAsync("Admin.ContentManagement.Menus"),
+                            PermissionNames = new List<string> { StandardPermission.ContentManagement.MENU_VIEW },
+                            Url = GetMenuItemUrl("Menu", "List"),
                             IconClass = "far fa-dot-circle"
                         },
                         new()
@@ -1042,8 +1058,8 @@ public partial class AdminMenu : IAdminMenu
 
         if (await _permissionService.AuthorizeAsync(StandardPermission.Configuration.MANAGE_PLUGINS, customer))
         {
-            await _eventPublisher.PublishAsync(new ThirdPartyPluginsMenuItemCreatedEvent(this, root.GetItemBySystem("Third party plugins")));
-            
+            await _eventPublisher.PublishAsync(new ThirdPartyPluginsMenuItemCreatedEvent(this, root.GetItemBySystemName("Third party plugins")));
+
             var adminMenuPlugins = await _adminMenuPluginManager.LoadAllPluginsAsync(customer);
 
             foreach (var adminMenuPlugin in adminMenuPlugins)

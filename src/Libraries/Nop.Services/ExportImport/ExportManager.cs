@@ -34,7 +34,6 @@ using Nop.Services.Helpers;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Media;
-using Nop.Services.Messages;
 using Nop.Services.Orders;
 using Nop.Services.Seo;
 using Nop.Services.Shipping;
@@ -76,7 +75,6 @@ public partial class ExportManager : IExportManager
     protected readonly ILocalizedEntityService _localizedEntityService;
     protected readonly IManufacturerService _manufacturerService;
     protected readonly IMeasureService _measureService;
-    protected readonly INewsLetterSubscriptionService _newsLetterSubscriptionService;
     protected readonly IOrderService _orderService;
     protected readonly IPictureService _pictureService;
     protected readonly IPriceFormatter _priceFormatter;
@@ -90,6 +88,7 @@ public partial class ExportManager : IExportManager
     protected readonly IStoreMappingService _storeMappingService;
     protected readonly IStoreService _storeService;
     protected readonly ITaxCategoryService _taxCategoryService;
+    protected readonly IThumbService _thumbService;
     protected readonly IUrlRecordService _urlRecordService;
     protected readonly IVendorService _vendorService;
     protected readonly IWorkContext _workContext;
@@ -124,7 +123,6 @@ public partial class ExportManager : IExportManager
         ILocalizedEntityService localizedEntityService,
         IManufacturerService manufacturerService,
         IMeasureService measureService,
-        INewsLetterSubscriptionService newsLetterSubscriptionService,
         IOrderService orderService,
         IPictureService pictureService,
         IPriceFormatter priceFormatter,
@@ -138,6 +136,7 @@ public partial class ExportManager : IExportManager
         IStoreMappingService storeMappingService,
         IStoreService storeService,
         ITaxCategoryService taxCategoryService,
+        IThumbService thumbService,
         IUrlRecordService urlRecordService,
         IVendorService vendorService,
         IWorkContext workContext,
@@ -168,7 +167,6 @@ public partial class ExportManager : IExportManager
         _localizedEntityService = localizedEntityService;
         _manufacturerService = manufacturerService;
         _measureService = measureService;
-        _newsLetterSubscriptionService = newsLetterSubscriptionService;
         _orderService = orderService;
         _pictureService = pictureService;
         _priceFormatter = priceFormatter;
@@ -182,6 +180,7 @@ public partial class ExportManager : IExportManager
         _storeMappingService = storeMappingService;
         _storeService = storeService;
         _taxCategoryService = taxCategoryService;
+        _thumbService = thumbService;
         _urlRecordService = urlRecordService;
         _vendorService = vendorService;
         _workContext = workContext;
@@ -227,7 +226,6 @@ public partial class ExportManager : IExportManager
             await xmlWriter.WriteStringAsync("PriceTo", category.PriceTo, await IgnoreExportCategoryPropertyAsync());
             await xmlWriter.WriteStringAsync("ManuallyPriceRange", category.ManuallyPriceRange, await IgnoreExportCategoryPropertyAsync());
             await xmlWriter.WriteStringAsync("ShowOnHomepage", category.ShowOnHomepage, await IgnoreExportCategoryPropertyAsync());
-            await xmlWriter.WriteStringAsync("IncludeInTopMenu", category.IncludeInTopMenu, await IgnoreExportCategoryPropertyAsync());
             await xmlWriter.WriteStringAsync("Published", category.Published, await IgnoreExportCategoryPropertyAsync());
             await xmlWriter.WriteStringAsync("Deleted", category.Deleted, true);
             await xmlWriter.WriteStringAsync("DisplayOrder", category.DisplayOrder);
@@ -274,7 +272,9 @@ public partial class ExportManager : IExportManager
     {
         var picture = await _pictureService.GetPictureByIdAsync(pictureId);
 
-        return await _pictureService.GetThumbLocalPathAsync(picture);
+        var (pictureUrl, _) = await _pictureService.GetPictureUrlAsync(picture);
+
+        return await _thumbService.GetThumbLocalPathAsync(pictureUrl);
     }
 
     /// <summary>
@@ -338,18 +338,18 @@ public partial class ExportManager : IExportManager
     }
 
     /// <summary>
-    /// Returns the list of limited to stores for a product separated by a ";"
+    /// Returns the list of limited to stores for an entity separated by a ";"
     /// </summary>
-    /// <param name="product">Product</param>
+    /// <param name="entity">IStoreMappingSupported entity</param>
     /// <returns>
     /// A task that represents the asynchronous operation
     /// The task result contains the list of store
     /// </returns>
-    protected virtual async Task<object> GetLimitedToStoresAsync(Product product)
+    protected virtual async Task<object> GetLimitedToStoresAsync<TEntity>(TEntity entity) where TEntity : BaseEntity, IStoreMappingSupported
     {
         string limitedToStores = null;
 
-        foreach (var storeMapping in await _storeMappingService.GetStoreMappingsAsync(product))
+        foreach (var storeMapping in await _storeMappingService.GetStoreMappingsAsync(entity))
         {
             var store = await _storeService.GetStoreByIdAsync(storeMapping.StoreId);
 
@@ -408,7 +408,12 @@ public partial class ExportManager : IExportManager
         var recordsToReturn = pictureIndex + 1;
         var pictures = await _pictureService.GetPicturesByProductIdAsync(product.Id, recordsToReturn);
 
-        return pictures.Count > pictureIndex ? await _pictureService.GetThumbLocalPathAsync(pictures[pictureIndex]) : null;
+        if (pictures.Count <= pictureIndex)
+            return null;
+
+        var (pictureUrl, _) = await _pictureService.GetPictureUrlAsync(pictures[pictureIndex]);
+
+        return await _thumbService.GetThumbLocalPathAsync(pictureUrl);
     }
 
     /// <returns>A task that represents the asynchronous operation</returns>
@@ -453,11 +458,19 @@ public partial class ExportManager : IExportManager
     }
 
     /// <returns>A task that represents the asynchronous operation</returns>
-    protected virtual async Task<bool> IgnoreExportLimitedToStoreAsync()
+    protected virtual async Task<bool> ProductIgnoreExportLimitedToStoreAsync()
     {
         return _catalogSettings.IgnoreStoreLimitations ||
                !_catalogSettings.ExportImportProductUseLimitedToStores ||
                (await _storeService.GetAllStoresAsync()).Count == 1;
+    }
+
+    /// <returns>A task that represents the asynchronous operation</returns>
+    protected virtual async Task<bool> CategoryIgnoreExportLimitedToStoreAsync()
+    {
+        return _catalogSettings.IgnoreStoreLimitations ||
+            !_catalogSettings.ExportImportCategoryUseLimitedToStores ||
+            (await _storeService.GetAllStoresAsync()).Count == 1;
     }
 
     /// <returns>A task that represents the asynchronous operation</returns>
@@ -535,7 +548,7 @@ public partial class ExportManager : IExportManager
             },
             new PropertyByName<ExportSpecificationAttribute>("SpecificationAttribute", (p, _) => p.SpecificationAttributeId)
             {
-                DropDownElements = (await _specificationAttributeService.GetSpecificationAttributesAsync()).Select(sa => sa as BaseEntity).ToSelectList(p => (p as SpecificationAttribute)?.Name ?? string.Empty)
+                DropDownElements = (await _specificationAttributeService.GetAllSpecificationAttributesAsync()).Select(sa => sa as BaseEntity).ToSelectList(p => (p as SpecificationAttribute)?.Name ?? string.Empty)
             },
             new PropertyByName<ExportSpecificationAttribute>("CustomValue", (p, _) => p.CustomValue),
             new PropertyByName<ExportSpecificationAttribute>("SpecificationAttributeOptionId", (p, _) => p.SpecificationAttributeOptionId),
@@ -1195,7 +1208,8 @@ public partial class ExportManager : IExportManager
             new PropertyByName<Category>("AllowCustomersToSelectPageSize", (p, _) => p.AllowCustomersToSelectPageSize, await IgnoreExportCategoryPropertyAsync()),
             new PropertyByName<Category>("PageSizeOptions", (p, _) => p.PageSizeOptions, await IgnoreExportCategoryPropertyAsync()),
             new PropertyByName<Category>("ShowOnHomepage", (p, _) => p.ShowOnHomepage, await IgnoreExportCategoryPropertyAsync()),
-            new PropertyByName<Category>("IncludeInTopMenu", (p, _) => p.IncludeInTopMenu, await IgnoreExportCategoryPropertyAsync()),
+            new PropertyByName<Category>("IsLimitedToStores", (p, _) => p.LimitedToStores, await CategoryIgnoreExportLimitedToStoreAsync()),
+            new PropertyByName<Category>("LimitedToStores",async (p, _) =>  await GetLimitedToStoresAsync(p), await CategoryIgnoreExportLimitedToStoreAsync()),
             new PropertyByName<Category>("Published", (p, _) => p.Published, await IgnoreExportCategoryPropertyAsync()),
             new PropertyByName<Category>("DisplayOrder", (p, _) => p.DisplayOrder)
         }, _catalogSettings, localizedProperties, languages);
@@ -1730,8 +1744,8 @@ public partial class ExportManager : IExportManager
             new PropertyByName<Product>("Categories", async (p, _) =>  await GetCategoriesAsync(p)),
             new PropertyByName<Product>("Manufacturers", async (p, _) =>  await GetManufacturersAsync(p), await IgnoreExportProductPropertyAsync(p => p.Manufacturers)),
             new PropertyByName<Product>("ProductTags", async (p, _) =>  await GetProductTagsAsync(p), await IgnoreExportProductPropertyAsync(p => p.ProductTags)),
-            new PropertyByName<Product>("IsLimitedToStores", (p, _) => p.LimitedToStores, await IgnoreExportLimitedToStoreAsync()),
-            new PropertyByName<Product>("LimitedToStores",async (p, _) =>  await GetLimitedToStoresAsync(p), await IgnoreExportLimitedToStoreAsync()),
+            new PropertyByName<Product>("IsLimitedToStores", (p, _) => p.LimitedToStores, await ProductIgnoreExportLimitedToStoreAsync()),
+            new PropertyByName<Product>("LimitedToStores",async (p, _) =>  await GetLimitedToStoresAsync(p), await ProductIgnoreExportLimitedToStoreAsync()),
             new PropertyByName<Product>("DisplayAttributeCombinationImagesOnly",(p, _) =>  p.DisplayAttributeCombinationImagesOnly, !productAdvancedMode),
             new PropertyByName<Product>("AgeVerification", (p, _) => p.AgeVerification, await IgnoreExportProductPropertyAsync(p => p.AgeVerification)),
             new PropertyByName<Product>("MinimumAgeToPurchase", (p, _) => p.MinimumAgeToPurchase, await IgnoreExportProductPropertyAsync(p => p.AgeVerification)),
@@ -2184,13 +2198,6 @@ public partial class ExportManager : IExportManager
             await xmlWriter.WriteElementStringAsync("VatNumberStatusId", null, customer.VatNumberStatusId.ToString());
             await xmlWriter.WriteElementStringAsync("TimeZoneId", null, customer.TimeZoneId);
 
-            foreach (var store in await _storeService.GetAllStoresAsync())
-            {
-                var newsletter = await _newsLetterSubscriptionService.GetNewsLetterSubscriptionByEmailAndStoreIdAsync(customer.Email, store.Id);
-                var subscribedToNewsletters = newsletter != null && newsletter.Active;
-                await xmlWriter.WriteElementStringAsync($"Newsletter-in-store-{store.Id}", null, subscribedToNewsletters.ToString());
-            }
-
             await xmlWriter.WriteElementStringAsync("AvatarPictureId", null, (await _genericAttributeService.GetAttributeAsync<int>(customer, NopCustomerDefaults.AvatarPictureIdAttribute)).ToString());
             await xmlWriter.WriteElementStringAsync("ForumPostCount", null, (await _genericAttributeService.GetAttributeAsync<int>(customer, NopCustomerDefaults.ForumPostCountAttribute)).ToString());
             await xmlWriter.WriteElementStringAsync("Signature", null, await _genericAttributeService.GetAttributeAsync<string>(customer, NopCustomerDefaults.SignatureAttribute));
@@ -2224,20 +2231,22 @@ public partial class ExportManager : IExportManager
     /// A task that represents the asynchronous operation
     /// The task result contains the result in TXT (string) format
     /// </returns>
-    public virtual async Task<string> ExportNewsletterSubscribersToTxtAsync(IList<NewsLetterSubscription> subscriptions)
+    public virtual async Task<string> ExportNewsLetterSubscribersToTxtAsync(IList<NewsLetterSubscription> subscriptions)
     {
         ArgumentNullException.ThrowIfNull(subscriptions);
 
         const char separator = ',';
         var sb = new StringBuilder();
 
-        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscriptions.Fields.Email"));
+        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscription.Fields.Email"));
         sb.Append(separator);
-        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscriptions.Fields.Active"));
+        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscription.Fields.Active"));
         sb.Append(separator);
-        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscriptions.Fields.Store"));
+        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscription.Fields.SubscriptionType"));
         sb.Append(separator);
-        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscriptions.Fields.Language"));
+        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscription.Fields.Store"));
+        sb.Append(separator);
+        sb.Append(await _localizationService.GetResourceAsync("Admin.Promotions.NewsLetterSubscription.Fields.Language"));
         sb.Append(Environment.NewLine);
 
         foreach (var subscription in subscriptions)
@@ -2245,6 +2254,8 @@ public partial class ExportManager : IExportManager
             sb.Append(subscription.Email);
             sb.Append(separator);
             sb.Append(subscription.Active);
+            sb.Append(separator);
+            sb.Append(subscription.TypeId);
             sb.Append(separator);
             sb.Append(subscription.StoreId);
             sb.Append(separator);

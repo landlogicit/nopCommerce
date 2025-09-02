@@ -33,16 +33,6 @@ public partial class AdminAreaSettings : ISettings
     public string RichEditorAdditionalSettings { get; set; }
 
     /// <summary>
-    /// A value indicating whether to javascript is supported in rich editor
-    /// </summary>
-    public bool RichEditorAllowJavaScript { get; set; }
-
-    /// <summary>
-    /// A value indicating whether to style tag is supported in rich editor
-    /// </summary>
-    public bool RichEditorAllowStyleTag { get; set; }
-
-    /// <summary>
     /// A value indicating whether to use rich text editor on email messages for customers
     /// </summary>
     public bool UseRichEditorForCustomerEmails { get; set; }
@@ -73,7 +63,7 @@ public partial class AdminAreaSettings : ISettings
     public bool UseIsoDateFormatInJsonResult { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether to documantation reference links on pages
+    /// Gets or sets a value indicating whether to documentation reference links on pages
     /// </summary>
     public bool ShowDocumentationReferenceLinks { get; set; }
 
@@ -81,4 +71,9 @@ public partial class AdminAreaSettings : ISettings
     /// Gets or sets a value indicating whether to the content header should be sticky when scrolling
     /// </summary>
     public bool UseStickyHeaderLayout { get; set; }
+
+    /// <summary>
+    /// Gets or sets the minimum number of drop-down list items to display search input.
+    /// </summary>
+    public int MinimumDropdownItemsForSearch { get; set; }
 }

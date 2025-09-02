@@ -340,8 +340,19 @@ public partial interface IOrderProcessingService
     Task<int> GetCyclesRemainingAsync(RecurringPayment recurringPayment);
 
     /// <summary>
-    /// Generate an order GUID
+    /// Gets process payment request
     /// </summary>
-    /// <param name="processPaymentRequest">Process payment request</param>
-    Task GenerateOrderGuidAsync(ProcessPaymentRequest processPaymentRequest);
+    /// <returns>
+    /// A task that represents the asynchronous operation
+    /// The task contains the process payment request
+    /// </returns>
+    Task<ProcessPaymentRequest> GetProcessPaymentRequestAsync();
+
+    /// <summary>
+    /// Sets process payment request
+    /// </summary>
+    /// <param name="processPaymentRequest">Process payment request. Pass null for delete</param>
+    /// <param name="useNewOrderGuid">Whether to use new order GUID; pass false to set GUID according to PaymentSettings.RegenerateOrderGuidInterval value</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
+    Task SetProcessPaymentRequestAsync(ProcessPaymentRequest processPaymentRequest, bool useNewOrderGuid = false);
 }

@@ -96,7 +96,22 @@ public class WorkflowMessageServiceTests : ServiceTest
             Text = string.Empty
         };
         _productReview = (await productService.GetAllProductReviewsAsync()).FirstOrDefault();
-        _giftCard = await giftCardService.GetGiftCardByIdAsync(1);
+        _giftCard = await GetService<INopDataProvider>().InsertEntityAsync(new GiftCard
+        {
+            GiftCardType = GiftCardType.Virtual,
+            PurchasedWithOrderItemId = 3,
+            Amount = 25M,
+            IsGiftCardActivated = false,
+            GiftCardCouponCode = string.Empty,
+            RecipientName = "Brenda Lindgren",
+            RecipientEmail = "brenda_lindgren@nopCommerce.com",
+            SenderName = "Steve Gates",
+            SenderEmail = "steve_gates@nopCommerce.com",
+            Message = string.Empty,
+            IsRecipientNotified = false,
+            CreatedOnUtc = DateTime.UtcNow
+        });
+
         _blogComment = await blogService.GetBlogCommentByIdAsync(1);
         _newsComment = await newsService.GetNewsCommentByIdAsync(1);
         _backInStockSubscription = new BackInStockSubscription { ProductId = _product.Id, CustomerId = _customer.Id };
@@ -352,7 +367,7 @@ public class WorkflowMessageServiceTests : ServiceTest
     public async Task CanSendWishlistEmailAFriendMessage()
     {
         await CheckData(async () =>
-            await _workflowMessageService.SendWishlistEmailAFriendMessageAsync(_customer, 1, NopTestsDefaults.AdminEmail, NopTestsDefaults.AdminEmail, string.Empty));
+            await _workflowMessageService.SendWishlistEmailAFriendMessageAsync(_customer, 1, NopTestsDefaults.AdminEmail, NopTestsDefaults.AdminEmail, string.Empty, string.Empty));
     }
 
     #endregion

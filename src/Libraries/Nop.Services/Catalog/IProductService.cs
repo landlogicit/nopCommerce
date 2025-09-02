@@ -73,7 +73,7 @@ public partial interface IProductService
     Task<IPagedList<Product>> GetProductsMarkedAsNewAsync(int storeId = 0, int pageIndex = 0, int pageSize = int.MaxValue);
 
     /// <summary>
-    /// Gets product
+    /// Gets a product
     /// </summary>
     /// <param name="productId">Product identifier</param>
     /// <returns>
@@ -385,14 +385,6 @@ public partial interface IProductService
     /// <param name="date">Date</param>
     /// <returns>Formatted date</returns>
     string FormatRentalDate(Product product, DateTime date);
-
-    /// <summary>
-    /// Update product store mappings
-    /// </summary>
-    /// <param name="product">Product</param>
-    /// <param name="limitedToStoresIds">A list of store ids for mapping</param>
-    /// <returns>A task that represents the asynchronous operation</returns>
-    Task UpdateProductStoreMappingsAsync(Product product, IList<int> limitedToStoresIds);
 
     /// <summary>
     /// Gets the value whether the sequence contains downloadable products

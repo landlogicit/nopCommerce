@@ -2,7 +2,6 @@
 using Nop.Core;
 using Nop.Core.Caching;
 using Nop.Core.Domain.Catalog;
-using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Discounts;
 using Nop.Core.Domain.Localization;
@@ -29,7 +28,6 @@ public partial class ProductService : IProductService
     #region Fields
 
     protected readonly CatalogSettings _catalogSettings;
-    protected readonly CommonSettings _commonSettings;
     protected readonly IAclService _aclService;
     protected readonly ICustomerService _customerService;
     protected readonly IDateRangeService _dateRangeService;
@@ -62,7 +60,6 @@ public partial class ProductService : IProductService
     protected readonly ISearchPluginManager _searchPluginManager;
     protected readonly IStaticCacheManager _staticCacheManager;
     protected readonly IStoreMappingService _storeMappingService;
-    protected readonly IStoreService _storeService;
     protected readonly IVendorService _vendorService;
     protected readonly IWorkContext _workContext;
     protected readonly LocalizationSettings _localizationSettings;
@@ -73,7 +70,6 @@ public partial class ProductService : IProductService
     #region Ctor
 
     public ProductService(CatalogSettings catalogSettings,
-        CommonSettings commonSettings,
         IAclService aclService,
         ICustomerService customerService,
         IDateRangeService dateRangeService,
@@ -105,14 +101,12 @@ public partial class ProductService : IProductService
         IRepository<TierPrice> tierPriceRepository,
         ISearchPluginManager searchPluginManager,
         IStaticCacheManager staticCacheManager,
-        IStoreService storeService,
         IVendorService vendorService,
         IStoreMappingService storeMappingService,
         IWorkContext workContext,
         LocalizationSettings localizationSettings)
     {
         _catalogSettings = catalogSettings;
-        _commonSettings = commonSettings;
         _aclService = aclService;
         _customerService = customerService;
         _dateRangeService = dateRangeService;
@@ -145,7 +139,6 @@ public partial class ProductService : IProductService
         _searchPluginManager = searchPluginManager;
         _staticCacheManager = staticCacheManager;
         _storeMappingService = storeMappingService;
-        _storeService = storeService;
         _vendorService = vendorService;
         _workContext = workContext;
         _localizationSettings = localizationSettings;
@@ -585,7 +578,7 @@ public partial class ProductService : IProductService
     }
 
     /// <summary>
-    /// Gets product
+    /// Gets a product
     /// </summary>
     /// <param name="productId">Product identifier</param>
     /// <returns>
@@ -1164,20 +1157,19 @@ public partial class ProductService : IProductService
             }
         }
 
-        var products = await productsQuery.OrderBy(_localizedPropertyRepository, await _workContext.GetWorkingLanguageAsync(), orderBy).ToPagedListAsync(pageIndex, pageSize);
-
         if (providerResults.Any() && orderBy == ProductSortingEnum.Position && !showHidden)
         {
-            var sortedProducts = products.OrderBy(p => 
-            {
-                var index = providerResults.IndexOf(p.Id);
-                return index == -1 ? products.TotalCount : index;
-            }).ToList();
+            var sortedProducts = from p in productsQuery
+                                 join pr in providerResults.Select((id, ind) => new { ind, id }) on p.Id equals pr.id into orderSeq
+                                 from os in orderSeq.DefaultIfEmpty()
+                                 orderby os == null ? int.MaxValue : os.ind
+                                 select p;
+                                 
 
-            return new PagedList<Product>(sortedProducts, pageIndex, pageSize, products.TotalCount);
+            return await sortedProducts.ToPagedListAsync(pageIndex, pageSize);
         }
 
-        return products;
+        return await productsQuery.OrderBy(_localizedPropertyRepository, await _workContext.GetWorkingLanguageAsync(), orderBy).ToPagedListAsync(pageIndex, pageSize);
     }
 
     /// <summary>
@@ -1235,20 +1227,21 @@ public partial class ProductService : IProductService
             query = query.Where(p => p.VendorId == vendorId);
         }
 
+        //apply store mapping constraints
+        if (!showHidden && storeId > 0)
+            query = await _storeMappingService.ApplyStoreMapping(query, storeId);
+
+        if (!showHidden)
+        {
+            //apply ACL constraints
+            var customer = await _workContext.GetCurrentCustomerAsync();
+            query = await _aclService.ApplyAcl(query, customer);
+        }
+
         query = query.Where(x => !x.Deleted);
         query = query.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Id);
 
-        var products = await query.ToListAsync();
-
-        //ACL mapping
-        if (!showHidden)
-            products = await products.WhereAwait(async x => await _aclService.AuthorizeAsync(x)).ToListAsync();
-
-        //Store mapping
-        if (!showHidden && storeId > 0)
-            products = await products.WhereAwait(async x => await _storeMappingService.AuthorizeAsync(x, storeId)).ToListAsync();
-
-        return products;
+        return await query.ToListAsync();
     }
 
     /// <summary>
@@ -1698,37 +1691,6 @@ public partial class ProductService : IProductService
             return null;
 
         return date.ToShortDateString();
-    }
-
-    /// <summary>
-    /// Update product store mappings
-    /// </summary>
-    /// <param name="product">Product</param>
-    /// <param name="limitedToStoresIds">A list of store ids for mapping</param>
-    /// <returns>A task that represents the asynchronous operation</returns>
-    public virtual async Task UpdateProductStoreMappingsAsync(Product product, IList<int> limitedToStoresIds)
-    {
-        product.LimitedToStores = limitedToStoresIds.Any();
-
-        var limitedToStoresIdsSet = limitedToStoresIds.ToHashSet();
-        var existingStoreMappingsByStoreId = (await _storeMappingService.GetStoreMappingsAsync(product))
-            .ToDictionary(sm => sm.StoreId);
-        var allStores = await _storeService.GetAllStoresAsync();
-        foreach (var store in allStores)
-        {
-            if (limitedToStoresIdsSet.Contains(store.Id))
-            {
-                //new store
-                if (!existingStoreMappingsByStoreId.ContainsKey(store.Id))
-                    await _storeMappingService.InsertStoreMappingAsync(product, store.Id);
-            }
-            else
-            {
-                //remove store
-                if (existingStoreMappingsByStoreId.TryGetValue(store.Id, out var storeMappingToDelete))
-                    await _storeMappingService.DeleteStoreMappingAsync(storeMappingToDelete);
-            }
-        }
     }
 
     /// <summary>
@@ -2784,18 +2746,11 @@ public partial class ProductService : IProductService
     {
         ArgumentNullException.ThrowIfNull(discount);
 
-        var mappingsWithProducts =
-            from dcm in _discountProductMappingRepository.Table
-            join p in _productRepository.Table on dcm.EntityId equals p.Id
-            where dcm.DiscountId == discount.Id
-            select new { product = p, dcm };
+        var mappingsWithProducts = await _discountProductMappingRepository.Table
+            .Where(dpm => dpm.DiscountId == discount.Id)
+            .ToListAsync();
 
-        var mappingsToDelete = new List<DiscountProductMapping>();
-        await foreach (var pdcm in mappingsWithProducts.ToAsyncEnumerable())
-        {
-            mappingsToDelete.Add(pdcm.dcm);
-        }
-        await _discountProductMappingRepository.DeleteAsync(mappingsToDelete);
+        await _discountProductMappingRepository.DeleteAsync(mappingsWithProducts);
     }
 
     /// <summary>

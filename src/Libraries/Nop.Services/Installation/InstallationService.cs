@@ -1,6 +1,9 @@
 ﻿using System.Linq.Expressions;
 using System.Text;
+using Newtonsoft.Json;
 using Nop.Core;
+using Nop.Core.Domain.Configuration;
+using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Seo;
 using Nop.Core.Infrastructure;
 using Nop.Data;
@@ -15,6 +18,7 @@ public partial class InstallationService : IInstallationService
 {
     #region Fields
 
+    protected readonly IHttpClientFactory _httpClientFactory;
     protected readonly INopDataProvider _dataProvider;
     protected readonly INopFileProvider _fileProvider;
     protected readonly IWebHelper _webHelper;
@@ -25,10 +29,12 @@ public partial class InstallationService : IInstallationService
 
     #region Ctor
 
-    public InstallationService(INopDataProvider dataProvider,
+    public InstallationService(IHttpClientFactory httpClientFactory,
+        INopDataProvider dataProvider,
         INopFileProvider fileProvider,
         IWebHelper webHelper)
     {
+        _httpClientFactory = httpClientFactory;
         _dataProvider = dataProvider;
         _fileProvider = fileProvider;
         _webHelper = webHelper;
@@ -37,6 +43,23 @@ public partial class InstallationService : IInstallationService
     #endregion
 
     #region Utilities
+
+    /// <summary>
+    /// Gets default customer identifier
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation
+    /// The task result contains the identifier of default customer</returns>
+    protected virtual async Task<int> GetDefaultCustomerIdAsync()
+    {
+        if (_defaultCustomerId.HasValue)
+            return _defaultCustomerId.Value;
+
+        var customer = await Table<Customer>().FirstOrDefaultAsync(x => x.Email == _installationSettings.AdminEmail) ?? throw new Exception("Cannot load default customer");
+
+        _defaultCustomerId = customer.Id;
+
+        return customer.Id;
+    }
 
     /// <summary>
     /// Returns queryable source for specified mapping class for current connection,
@@ -166,6 +189,7 @@ public partial class InstallationService : IInstallationService
         await InstallProductAvailabilityRangesAsync();
         await InstallEmailAccountsAsync();
         await InstallMessageTemplatesAsync();
+        await InstallNewsLetterSubscriptionTypeAsync();
         await InstallTopicTemplatesAsync();
         await InstallSettingsAsync();
         await InstallCustomersAndUsersAsync();
@@ -177,28 +201,41 @@ public partial class InstallationService : IInstallationService
         await InstallScheduleTasksAsync();
         await InstallReturnRequestReasonsAsync();
         await InstallReturnRequestActionsAsync();
+        await InstallMenusAsync();
 
         if (!installationSettings.InstallSampleData)
             return;
 
-        await InstallSampleCustomersAsync();
-        await InstallCheckoutAttributesAsync();
-        await InstallSpecificationAttributesAsync();
-        await InstallProductAttributesAsync();
-        await InstallCategoriesAsync();
-        await InstallManufacturersAsync();
-        await InstallProductsAsync();
-        await InstallForumsAsync();
-        await InstallDiscountsAsync();
-        await InstallBlogPostsAsync();
-        await InstallNewsAsync();
-        await InstallPollsAsync();
-        await InstallWarehousesAsync();
-        await InstallVendorsAsync();
-        await InstallAffiliatesAsync();
-        await InstallOrdersAsync();
-        await InstallActivityLogsAsync();
-        await InstallSearchTermsAsync();
+        //save setting to install plugin sample data
+        var setting = new Setting
+        {
+            Name = NopInstallationDefaults.InstallPluginSampleDataSettingName,
+            Value = "true",
+            StoreId = 0
+        };
+
+        await _dataProvider.InsertEntityAsync(setting);
+
+        var sampleData = JsonConvert.DeserializeObject<SampleData.SampleData>(await _fileProvider.ReadAllTextAsync(_fileProvider.MapPath(NopInstallationDefaults.SampleDataPath), Encoding.UTF8));
+
+        await InstallSampleCustomersAsync(sampleData.Customers);
+        await InstallCheckoutAttributesAsync(sampleData.CheckoutAttributes);
+        await InstallSpecificationAttributesAsync(sampleData.SpecificationAttributes);
+        await InstallProductAttributesAsync(sampleData.ProductAttributes);
+        await InstallCategoriesAsync(sampleData.Categories);
+        await InstallManufacturersAsync(sampleData.Manufacturers);
+        await InstallProductsAsync(sampleData.Products);
+        await InstallForumsAsync(sampleData.ForumGroups);
+        await InstallDiscountsAsync(sampleData.Discounts);
+        await InstallBlogPostsAsync(sampleData.BlogPosts);
+        await InstallNewsAsync(sampleData.NewsItems);
+        await InstallPollsAsync(sampleData.Polls);
+        await InstallWarehousesAsync(sampleData.Warehouses);
+        await InstallVendorsAsync(sampleData.Vendors);
+        await InstallAffiliatesAsync(sampleData.Affiliates);
+        await InstallOrdersAsync(sampleData.Orders);
+        await InstallActivityLogsAsync(sampleData.ActivityLogs);
+        await InstallSearchTermsAsync(sampleData.SearchTerms);
     }
 
     #endregion

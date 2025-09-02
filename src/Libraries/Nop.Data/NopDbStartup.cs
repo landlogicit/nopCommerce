@@ -39,11 +39,13 @@ public partial class NopDbStartup : INopStartup
             // set accessor for the connection string
             .AddScoped<IConnectionStringAccessor>(x => DataSettingsManager.LoadSettings())
             .AddScoped<IMigrationManager, MigrationManager>()
-            .AddSingleton<IConventionSet, NopConventionSet>()
+            .AddScoped<IConventionSet, NopConventionSet>()
             .ConfigureRunner(rb =>
-                rb.WithVersionTable(new MigrationVersionInfo()).AddSqlServer().AddMySql5().AddPostgres()
+                rb.WithVersionTable(new MigrationVersionInfo())
+                    .AddNopDbEngines()
                     // define the assembly containing the migrations
-                    .ScanIn(mAssemblies).For.Migrations().SetCommandTimeout());
+                    .ScanIn(mAssemblies).For.Migrations()
+                    .SetCommandTimeout());
 
         services.AddTransient(p => new Lazy<IVersionLoader>(p.GetRequiredService<IVersionLoader>()));
 
