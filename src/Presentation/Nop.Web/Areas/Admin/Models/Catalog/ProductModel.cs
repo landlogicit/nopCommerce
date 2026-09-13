@@ -2,8 +2,8 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Web.Areas.Admin.Models.Settings;
 using Nop.Web.Framework.Models;
-using Nop.Web.Framework.Models.Translation;
 using Nop.Web.Framework.Models.ArtificialIntelligence;
+using Nop.Web.Framework.Models.Translation;
 using Nop.Web.Framework.Mvc.ModelBinding;
 
 namespace Nop.Web.Areas.Admin.Models.Catalog;
@@ -27,6 +27,7 @@ public partial record ProductModel : BaseNopEntityModel,
         ProductWarehouseInventoryModels = new List<ProductWarehouseInventoryModel>();
         ProductEditorSettingsModel = new ProductEditorSettingsModel();
         StockQuantityHistory = new StockQuantityHistoryModel();
+        Product3dObject = new Product3dObjectModel();
 
         AvailableBasepriceUnits = new List<SelectListItem>();
         AvailableBasepriceBaseUnits = new List<SelectListItem>();
@@ -57,8 +58,12 @@ public partial record ProductModel : BaseNopEntityModel,
         AvailableProductTags = new List<SelectListItem>();
         SelectedProductTags = new List<string>();
 
+        SelectedPriceListIds = new List<int>();
+        AvailablePriceLists = new List<SelectListItem>();
+
         RelatedProductSearchModel = new RelatedProductSearchModel();
         CrossSellProductSearchModel = new CrossSellProductSearchModel();
+        FilterLevelValueSearchModel = new FilterLevelValueSearchModel();
         AssociatedProductSearchModel = new AssociatedProductSearchModel();
         ProductPictureSearchModel = new ProductPictureSearchModel();
         ProductVideoSearchModel = new ProductVideoSearchModel();
@@ -434,6 +439,12 @@ public partial record ProductModel : BaseNopEntityModel,
     public IList<int> SelectedDiscountIds { get; set; }
     public IList<SelectListItem> AvailableDiscounts { get; set; }
 
+    //price lists
+    public IList<SelectListItem> AvailablePriceLists { get; set; }
+
+    [NopResourceDisplayName("Admin.Catalog.Products.Fields.PriceLists")]
+    public IList<int> SelectedPriceListIds { get; set; }
+
     //vendor
     public bool IsLoggedInAsVendor { get; set; }
 
@@ -444,6 +455,9 @@ public partial record ProductModel : BaseNopEntityModel,
     //videos
     public ProductVideoModel AddVideoModel { get; set; }
     public IList<ProductVideoModel> ProductVideoModels { get; set; }
+
+    //3D object
+    public Product3dObjectModel Product3dObject { get; set; }
 
     //product attributes
     public bool ProductAttributesExist { get; set; }
@@ -470,6 +484,8 @@ public partial record ProductModel : BaseNopEntityModel,
     public RelatedProductSearchModel RelatedProductSearchModel { get; set; }
 
     public CrossSellProductSearchModel CrossSellProductSearchModel { get; set; }
+
+    public FilterLevelValueSearchModel FilterLevelValueSearchModel { get; set; }
 
     public AssociatedProductSearchModel AssociatedProductSearchModel { get; set; }
 

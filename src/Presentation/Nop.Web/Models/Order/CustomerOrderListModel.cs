@@ -7,6 +7,7 @@ namespace Nop.Web.Models.Order;
 public partial record CustomerOrderListModel : BaseNopModel
 {
     public List<CustomerOrderModel> Orders { get; set; } = new();
-    public SelectList AvailableLimits { get; set; }
+    public IList<SelectListItem> AvailableLimits { get; set; }
     public PagerModel PagerModel { get; set; }
+    public string ReturnItemsButtonText { get; set; }
 }

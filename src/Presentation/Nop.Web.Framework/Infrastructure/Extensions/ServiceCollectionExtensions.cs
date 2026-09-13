@@ -1,6 +1,5 @@
 ﻿using System.Threading.RateLimiting;
 using FluentValidation;
-using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -10,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json.Serialization;
 using Nop.Core;
 using Nop.Core.Configuration;
@@ -22,6 +22,7 @@ using Nop.Services.ArtificialIntelligence;
 using Nop.Services.Authentication;
 using Nop.Services.Authentication.External;
 using Nop.Services.Common;
+using Nop.Web.Framework.ClientsideFluentValidation;
 using Nop.Web.Framework.Mvc.ModelBinding;
 using Nop.Web.Framework.Mvc.ModelBinding.Binders;
 using Nop.Web.Framework.Mvc.Routing;
@@ -115,23 +116,27 @@ public static class ServiceCollectionExtensions
         //create engine and configure service provider
         var engine = EngineContext.Create();
 
-        builder.Services.AddRateLimiter(options =>
+        var commonConfig = Singleton<AppSettings>.Instance.Get<CommonConfig>();
+
+        //add rate limiting if enabled and configured correctly
+        if (commonConfig.PermitLimit > 0)
         {
-            var settings = Singleton<AppSettings>.Instance.Get<CommonConfig>();
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = commonConfig.PermitLimit,
+                            QueueLimit = commonConfig.QueueCount,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
 
-            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
-                    factory: partition => new FixedWindowRateLimiterOptions
-                    {
-                        AutoReplenishment = true,
-                        PermitLimit = settings.PermitLimit,
-                        QueueLimit = settings.QueueCount,
-                        Window = TimeSpan.FromMinutes(1)
-                    }));
-
-            options.RejectionStatusCode = settings.RejectionStatusCode;
-        });
+                options.RejectionStatusCode = commonConfig.RejectionStatusCode;
+            });
+        }
 
         engine.ConfigureServices(services, builder.Configuration);
     }
@@ -329,9 +334,7 @@ public static class ServiceCollectionExtensions
         //set some options
         mvcBuilder.AddMvcOptions(options =>
         {
-            options.ModelBinderProviders.Insert(1, new NopModelBinderProvider());
-            //add custom display metadata provider 
-            options.ModelMetadataDetailsProviders.Add(new NopMetadataProvider());
+            options.ModelBinderProviders.Insert(0, new NopModelBinderProvider());
 
             //in .NET model binding for a non-nullable property may fail with an error message "The value '' is invalid"
             //here we set the locale name as the message, we'll replace it with the actual one later when not-null validation failed
@@ -339,7 +342,8 @@ public static class ServiceCollectionExtensions
         });
 
         //add fluent validation
-        services.AddFluentValidationAutoValidation().AddFluentValidationClientsideAdapters();
+        services.TryAddSingleton(ValidatorOptions.Global);
+        mvcBuilder.AddViewOptions(options => options.ClientModelValidatorProviders.Add(new NopClientModelValidatorProvider()));
 
         //register all available validators from Nop assemblies
         var assemblies = mvcBuilder.PartManager.ApplicationParts

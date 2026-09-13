@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using AwesomeAssertions;
+using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Caching;
 using Nop.Core.Domain.Catalog;
@@ -34,6 +35,7 @@ namespace Nop.Tests.Nop.Web.Tests.Public.Factories;
 public class ProductModelFactoryTests : WebTest
 {
     private IProductModelFactory _productModelFactory;
+    private IProductReviewService _productReviewService;
     private IProductService _productService;
     private IUrlRecordService _urlRecordService;
 
@@ -43,6 +45,7 @@ public class ProductModelFactoryTests : WebTest
     public void SetUp()
     {
         _productModelFactory = GetService<IProductModelFactory>();
+        _productReviewService = GetService<IProductReviewService>();
         _productService = GetService<IProductService>();
         _urlRecordService = GetService<IUrlRecordService>();
         _productModelFactoryForTest = GetService<ProductModelFactoryForTest>();
@@ -103,7 +106,7 @@ public class ProductModelFactoryTests : WebTest
     [Test]
     public async Task CanPrepareProductReviewsModel()
     {
-        var pId = (await _productService.GetProductReviewByIdAsync(1)).ProductId;
+        var pId = (await _productReviewService.GetProductReviewByIdAsync(1)).ProductId;
         var product = await _productService.GetProductByIdAsync(pId);
         var model = await _productModelFactory.PrepareProductReviewsModelAsync(product);
 
@@ -153,7 +156,7 @@ public class ProductModelFactoryTests : WebTest
 
     public class ProductModelFactoryForTest : ProductModelFactory
     {
-        public ProductModelFactoryForTest(CaptchaSettings captchaSettings, CatalogSettings catalogSettings, CustomerSettings customerSettings, ICategoryService categoryService, ICurrencyService currencyService, ICustomerService customerService, ICustomWishlistService customWishlistService, IDateRangeService dateRangeService, IDateTimeHelper dateTimeHelper, IDownloadService downloadService, IGenericAttributeService genericAttributeService, IJsonLdModelFactory jsonLdModelFactory, ILocalizationService localizationService, IManufacturerService manufacturerService, IPermissionService permissionService, IPictureService pictureService, IPriceCalculationService priceCalculationService, IPriceFormatter priceFormatter, IProductAttributeParser productAttributeParser, IProductAttributeService productAttributeService, IProductService productService, IProductTagService productTagService, IProductTemplateService productTemplateService, IReviewTypeService reviewTypeService, IShoppingCartService shoppingCartService, ISpecificationAttributeService specificationAttributeService, IStaticCacheManager staticCacheManager, IStoreContext storeContext, IStoreService storeService, IShoppingCartModelFactory shoppingCartModelFactory, ITaxService taxService, IUrlRecordService urlRecordService, IVendorService vendorService, IVideoService videoService, IWebHelper webHelper, IWorkContext workContext, MediaSettings mediaSettings, OrderSettings orderSettings, SeoSettings seoSettings, ShippingSettings shippingSettings, VendorSettings vendorSettings) : base(captchaSettings, catalogSettings, customerSettings, categoryService, currencyService, customerService, customWishlistService, dateRangeService, dateTimeHelper, downloadService, genericAttributeService, jsonLdModelFactory, localizationService, manufacturerService, permissionService, pictureService, priceCalculationService, priceFormatter, productAttributeParser, productAttributeService, productService, productTagService, productTemplateService, reviewTypeService, shoppingCartService, specificationAttributeService, staticCacheManager, storeContext, storeService, shoppingCartModelFactory, taxService, urlRecordService, vendorService, videoService, webHelper, workContext, mediaSettings, orderSettings, seoSettings, shippingSettings, vendorSettings)
+        public ProductModelFactoryForTest(CaptchaSettings captchaSettings, CatalogSettings catalogSettings, CustomerSettings customerSettings, GpsrSettings gpsrSettings, ICategoryService categoryService, ICurrencyService currencyService, ICustomerService customerService, ICustomWishlistService customWishlistService, IDateRangeService dateRangeService, IDateTimeHelper dateTimeHelper, IDownloadService downloadService, IGenericAttributeService genericAttributeService, IHttpContextAccessor httpContextAccessor, IJsonLdModelFactory jsonLdModelFactory, ILocalizationService localizationService, IManufacturerService manufacturerService, IPermissionService permissionService, IPictureService pictureService, IPriceCalculationService priceCalculationService, IPriceFormatter priceFormatter, IProductAttributeParser productAttributeParser, IProductAttributeService productAttributeService, IProductReviewService productReviewService, IProductService productService, IProductTagService productTagService, IProductTemplateService productTemplateService, IReviewTypeService reviewTypeService, IShoppingCartService shoppingCartService, ISpecificationAttributeService specificationAttributeService, IStaticCacheManager staticCacheManager, IStoreContext storeContext, IStoreService storeService, IShoppingCartModelFactory shoppingCartModelFactory, ITaxService taxService, IUrlRecordService urlRecordService, IVendorService vendorService, IVideoService videoService, IWebHelper webHelper, IWorkContext workContext, MediaSettings mediaSettings, OrderSettings orderSettings, SeoSettings seoSettings, ShippingSettings shippingSettings, VendorSettings vendorSettings) : base(captchaSettings, catalogSettings, customerSettings, gpsrSettings, categoryService, currencyService, customerService, customWishlistService, dateRangeService, dateTimeHelper, downloadService, genericAttributeService, httpContextAccessor, jsonLdModelFactory, localizationService, manufacturerService, permissionService, pictureService, priceCalculationService, priceFormatter, productAttributeParser, productAttributeService, productReviewService, productService, productTagService, productTemplateService, reviewTypeService, shoppingCartService, specificationAttributeService, staticCacheManager, storeContext, storeService, shoppingCartModelFactory, taxService, urlRecordService, vendorService, videoService, webHelper, workContext, mediaSettings, orderSettings, seoSettings, shippingSettings, vendorSettings)
         {
         }
 
@@ -366,8 +369,9 @@ public class ProductModelFactoryTests : WebTest
                         priceModel.DisplayTaxShippingInfo = _catalogSettings.DisplayTaxShippingInfoProductBoxes && product.IsShipEnabled && !product.IsFreeShipping;
 
                         //PAngV default baseprice (used in Germany)
-                        priceModel.BasePricePAngV = await _priceFormatter.FormatBasePriceAsync(product, finalPriceWithDiscount);
-                        priceModel.BasePricePAngVValue = finalPriceWithDiscount;
+                        var basePrice = await _productService.GetBaseProductPriceAsync(product, finalPriceWithDiscount);
+                        priceModel.BasePricePAngV = await _priceFormatter.FormatBasePriceAsync(product, basePrice);
+                        priceModel.BasePricePAngVValue = basePrice;
                     }
                 }
                 else
@@ -450,8 +454,9 @@ public class ProductModelFactoryTests : WebTest
                         priceModel.PriceValue = finalPrice;
 
                         //PAngV default baseprice (used in Germany)
-                        priceModel.BasePricePAngV = await _priceFormatter.FormatBasePriceAsync(product, finalPriceBase);
-                        priceModel.BasePricePAngVValue = finalPriceBase;
+                        var basePrice = await _productService.GetBaseProductPriceAsync(product, finalPrice);
+                        priceModel.BasePricePAngV = await _priceFormatter.FormatBasePriceAsync(product, basePrice);
+                        priceModel.BasePricePAngVValue = basePrice;
                     }
                 }
                 else
@@ -562,8 +567,9 @@ public class ProductModelFactoryTests : WebTest
                                                        !product.IsFreeShipping;
 
                         //PAngV baseprice (used in Germany)
-                        model.BasePricePAngV = await _priceFormatter.FormatBasePriceAsync(product, finalPriceWithDiscountBase);
-                        model.BasePricePAngVValue = finalPriceWithDiscountBase;
+                        var basePrice = await _productService.GetBaseProductPriceAsync(product, finalPriceWithDiscount);
+                        model.BasePricePAngV = await _priceFormatter.FormatBasePriceAsync(product, basePrice);
+                        model.BasePricePAngVValue = basePrice;
 
                         //rental
                         if (product.IsRental)
